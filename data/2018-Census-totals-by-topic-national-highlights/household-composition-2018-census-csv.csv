@@ -1,0 +1,34 @@
+"Code","Household_composition","Households_in_occupied_private_dwellings"
+"100","One-family household nfd",0
+"111","Couple only",406119
+"120","Couple only and other person(s) nfd",0
+"121","Couple only and other person(s), some or all related",16572
+"122","Couple only and other person(s), all unrelated",24381
+"131","Couple with child(ren)",434472
+"140","Couple with child(ren) and other person(s) nfd",0
+"141","Couple with child(ren) and other person(s), some or all related",26514
+"142","Couple with child(ren) and other person(s), all unrelated",14163
+"151","One parent with child(ren)",135987
+"160","One parent with child(ren) and other person(s) nfd",0
+"161","One parent with child(ren) and other person(s), some or all related",17826
+"162","One parent with child(ren) and other person(s), all unrelated",14142
+"200","Two-family household nfd",0
+"210","Two 2-parent families nfd",0
+"211","Two related 2-parent families",3864
+"212","Two unrelated 2-parent families",429
+"220","One 2-parent family and a 1-parent family nfd",0
+"221","One 2-parent family related to a 1-parent family",6375
+"222","One 2-parent family unrelated to a 1-parent family",693
+"230","Two 1-parent families nfd",0
+"231","Two related 1-parent families",4206
+"232","Two unrelated 1-parent families",822
+"241","Other 2-family household",36132
+"311","Three or more family household (with or without other people)",3378
+"400","Other multi-person household nfd",0
+"411","Household of related people",12762
+"421","Household of related and unrelated people",2925
+"431","Household of unrelated people",65661
+"511","One-person household",361377
+"611","Household composition unidentifiable",64986
+"TotalStated","Total stated",1588809
+"Total","Total",1653792

@@ -1,0 +1,15 @@
+Code,Main_means_of_travel_to_work,Employed_census_usually_resident_population_count_aged_15_years_and_over
+1,Work at home,291135
+3,"Drive a private car, truck or van",1412994
+4,"Drive a company car, truck or van",274905
+5,"Passenger in a car, truck, van or company bus",97584
+6,Public bus,103194
+7,Train,48777
+9,Bicycle,47811
+10,Walk or jog,127350
+12,Ferry,6045
+15,Other,35343
+77,Response unidentifiable,0
+99,Not stated,0
+TotalStated,Total stated,2445141
+Total,Total,2445141
