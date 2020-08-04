@@ -1,0 +1,71 @@
+---
+title: "Exploratory data analysis"
+author: "Sam Gardiner"
+date: "1 August 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(here)
+library(naniar)
+library(tidygraph)
+library(ggraph)
+```
+
+## File input
+
+```{r}
+nzl_raw <- read_csv(here("data/NZL.csv"))
+```
+
+## Missingness?
+
+```{r}
+nzl_missing <- nzl_raw %>%
+  mutate(across(where(is.numeric), ~if_else(.x %in% -1:-5, NA_real_, .x)))
+
+
+# Case-wise completeness?
+pct_complete_case(nzl_missing)
+# Variable-wise completeness?
+pct_complete_var(nzl_missing)
+# Cell-wise completeness?
+pct_complete(nzl_missing)
+```
+
+## Correlations?
+
+Scale everything and compare.
+
+```{r}
+# Scale and compute Pearson's correlation
+nzl_corr <- nzl_missing %>%
+  select(starts_with("Q")) %>%
+  select(-Q_MODE)  %>%
+  mutate(across(everything(),  scale)) %>%
+  cor(use = "pairwise")
+
+# Build a correlation network
+nzl_corr_graph <- as_tbl_graph(nzl_corr, directed = FALSE)
+
+# Filter out the low correlations and visualise
+nzl_corr_trimmed <- nzl_corr_graph %>%
+  activate(edges) %>%
+  filter(from != to) %>%
+  top_n(150, abs(weight)) %>%
+  activate(nodes) %>%
+  filter(centrality_degree() > 1)
+
+  ggraph(nzl_corr_trimmed, layout = "circle")+
+  geom_node_point() +
+  geom_edge_diagonal(aes(colour = weight)) +
+  geom_node_text(aes(label = name, x = x * 1.15, y = y * 1.15), size = 2.5) +
+  scale_edge_colour_distiller(type = "div", palette = "RdBu", limits = c(-1, 1)) +
+  theme_graph()
+```
+
