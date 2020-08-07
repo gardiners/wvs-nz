@@ -27,8 +27,8 @@ nzl_raw <- read_csv(here("data/NZL.csv"))
 
 ```{r}
 nzl_missing <- nzl_raw %>%
+  select(starts_with("Q")) %>%
   mutate(across(where(is.numeric), ~if_else(.x %in% -1:-5, NA_real_, .x)))
-
 
 # Case-wise completeness?
 pct_complete_case(nzl_missing)
