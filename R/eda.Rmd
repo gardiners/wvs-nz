@@ -40,7 +40,7 @@ pct_complete(nzl_missing)
 ```
 ### Demographics missingness?
 
-**Noteable**: patterns of missingness are structural. For example, people who have missing data for spouse education also have missing data for spouse income - because they don't have a spouse. NMAR. Imputation not sensible in these cases.
+**Notable**: patterns of missingness are structural. For example, people who have missing data for spouse education also have missing data for spouse income - because they don't have a spouse. NMAR. Imputation not sensible in these cases.
 
 ```{r fig.height=8}
 nzl_missing %>%
@@ -53,7 +53,7 @@ nzl_missing %>%
 
 ## Rural vs city (small town vs bigger town)
 
-Overwhelmingly city respondants:
+Overwhelmingly city respondents:
 
 ```{r}
 nzl_raw %>%
