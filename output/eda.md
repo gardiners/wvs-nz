@@ -1,9 +1,14 @@
-Exploratory data analysis
-================
-Sam Gardiner
-1 August 2020
+---
+title: "Exploratory data analysis"
+author: "Sam Gardiner"
+date: "1 August 2020"
+output: html_document
+---
 
-``` r
+
+
+
+```r
 library(tidyverse)
 library(here)
 library(naniar)
@@ -14,13 +19,15 @@ library(lubridate)
 
 ## File input
 
-``` r
+
+```r
 nzl_raw <- read_csv(here("data/NZL.csv"))
 ```
 
 ## Missingness?
 
-``` r
+
+```r
 nzl_missing <- nzl_raw %>%
   select(starts_with("Q")) %>%
   mutate(across(where(is.numeric), ~if_else(.x %in% -1:-5, NA_real_, .x)))
@@ -29,56 +36,66 @@ nzl_missing <- nzl_raw %>%
 pct_complete_case(nzl_missing)
 ```
 
-    ## [1] 0
+```
+## [1] 0
+```
 
-``` r
+```r
 # Variable-wise completeness?
 pct_complete_var(nzl_missing)
 ```
 
-    ## [1] 5.033557
+```
+## [1] 5.033557
+```
 
-``` r
+```r
 # Cell-wise completeness?
 pct_complete(nzl_missing)
 ```
 
-    ## [1] 90.39989
-
+```
+## [1] 90.39989
+```
 ### Demographics missingness?
 
-**Noteable**: patterns of missingness are structural. For example,
-people who have missing data for spouse education also have missing data
-for spouse income - because they don’t have a spouse. NMAR. Imputation
-not sensible in these cases.
+**Noteable**: patterns of missingness are structural. For example, people who have missing data for spouse education also have missing data for spouse income - because they don't have a spouse. NMAR. Imputation not sensible in these cases.
 
-``` r
+
+```r
 nzl_missing %>%
   select(starts_with(paste0("Q", 260:287))) %>%
   gg_miss_upset(nsets = 10)
 ```
 
-![](C:/Users/Sam/Documents/Dev-offline/wvs-nz/output/eda_files/figure-gfm/unnamed-chunk-4-1.png)<!-- -->
+![plot of chunk unnamed-chunk-4](eda/unnamed-chunk-4-1.png)
+
+
+
 
 ## Rural vs city (small town vs bigger town)
 
 Overwhelmingly city respondants:
 
-``` r
+
+```r
 nzl_raw %>%
   select(H_SETTLEMENT, H_URBRURAL) %>%
   mutate(across(.fns = as.factor)) %>%
   summary()
 ```
 
-    ##  H_SETTLEMENT H_URBRURAL
-    ##  -5: 63       1:950     
-    ##  1 :824       2:107     
-    ##  2 :170
+```
+##  H_SETTLEMENT H_URBRURAL
+##  -5: 63       1:950     
+##  1 :824       2:107     
+##  2 :170
+```
 
 However, a uniform-ish range of town sizes:
 
-``` r
+
+```r
 nzl_raw %>%
   select(starts_with("G_")) %>%
   pivot_longer(everything()) %>%
@@ -88,11 +105,12 @@ nzl_raw %>%
   facet_wrap(~name)
 ```
 
-![](C:/Users/Sam/Documents/Dev-offline/wvs-nz/output/eda_files/figure-gfm/unnamed-chunk-6-1.png)<!-- -->
+![plot of chunk unnamed-chunk-6](eda/unnamed-chunk-6-1.png)
 
 ## News sources
 
-``` r
+
+```r
 nzl_news <- nzl_raw %>%
   select(starts_with(paste0("Q", 201:208))) %>%
   pivot_longer(everything()) %>%
@@ -108,9 +126,9 @@ ggplot(nzl_news, aes(value)) +
   theme(axis.text.x = element_text(angle = 90, hjust = 1))
 ```
 
-![](C:/Users/Sam/Documents/Dev-offline/wvs-nz/output/eda_files/figure-gfm/unnamed-chunk-7-1.png)<!-- -->
+![plot of chunk unnamed-chunk-7](eda/unnamed-chunk-7-1.png)
 
-``` r
+```r
 nzl_news %>%
   mutate(name = fct_collapse(name,
                              "Old media" = c("Q201P", "Q202P", "Q203P"),
@@ -122,14 +140,15 @@ nzl_news %>%
   theme(axis.text.x = element_text(angle = 90, hjust = 1))
 ```
 
-![](C:/Users/Sam/Documents/Dev-offline/wvs-nz/output/eda_files/figure-gfm/unnamed-chunk-7-2.png)<!-- -->
+![plot of chunk unnamed-chunk-7](eda/unnamed-chunk-7-2.png)
+
 
 ## Correlations?
 
-Scale everything and compare. Religion seems to come out as being the
-strongest association with other values.
+Scale everything and compare. Religion seems to come out as being the strongest association with other values.
 
-``` r
+
+```r
 # Scale and compute Pearson's correlation
 nzl_corr <- nzl_missing %>%
   select(starts_with("Q")) %>%
@@ -156,25 +175,29 @@ nzl_corr_trimmed <- nzl_corr_graph %>%
   theme_graph()
 ```
 
-    ## Warning in grid.Call(C_textBounds, as.graphicsAnnot(x$label), x$x,
-    ## x$y, : font family not found in Windows font database
-    
-    ## Warning in grid.Call(C_textBounds, as.graphicsAnnot(x$label), x$x,
-    ## x$y, : font family not found in Windows font database
-    
-    ## Warning in grid.Call(C_textBounds, as.graphicsAnnot(x$label), x$x,
-    ## x$y, : font family not found in Windows font database
-    
-    ## Warning in grid.Call(C_textBounds, as.graphicsAnnot(x$label), x$x,
-    ## x$y, : font family not found in Windows font database
+```
+## Warning in grid.Call(C_textBounds, as.graphicsAnnot(x$label), x$x,
+## x$y, : font family not found in Windows font database
 
-![](C:/Users/Sam/Documents/Dev-offline/wvs-nz/output/eda_files/figure-gfm/unnamed-chunk-8-1.png)<!-- -->
+## Warning in grid.Call(C_textBounds, as.graphicsAnnot(x$label), x$x,
+## x$y, : font family not found in Windows font database
+
+## Warning in grid.Call(C_textBounds, as.graphicsAnnot(x$label), x$x,
+## x$y, : font family not found in Windows font database
+
+## Warning in grid.Call(C_textBounds, as.graphicsAnnot(x$label), x$x,
+## x$y, : font family not found in Windows font database
+```
+
+![plot of chunk unnamed-chunk-8](eda/unnamed-chunk-8-1.png)
+
 
 ## Interview date distribution
 
 Binwidth is weeks.
 
-``` r
+
+```r
 nzl_raw %>%
   select(J_INTDATE) %>%
   mutate(J_INTDATE = ymd(J_INTDATE)) %>%
@@ -184,4 +207,5 @@ nzl_raw %>%
   labs(x = "Interview date")
 ```
 
-![](C:/Users/Sam/Documents/Dev-offline/wvs-nz/output/eda_files/figure-gfm/unnamed-chunk-9-1.png)<!-- -->
+![plot of chunk unnamed-chunk-9](eda/unnamed-chunk-9-1.png)
+
