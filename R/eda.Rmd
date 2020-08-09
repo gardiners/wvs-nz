@@ -6,7 +6,7 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warn = FALSE)
 ```
 
 ```{r}
@@ -37,6 +37,63 @@ pct_complete_var(nzl_missing)
 # Cell-wise completeness?
 pct_complete(nzl_missing)
 ```
+### Demographics missingness?
+
+```{r fig.height=8}
+nzl_missing %>%
+  select(starts_with(paste0("Q", 260:287))) %>%
+  gg_miss_upset(nsets = 10)
+```
+
+
+
+
+## Rural vs city (small town vs bigger town)
+
+```{r}
+nzl_raw %>%
+  select(H_SETTLEMENT, H_URBRURAL) %>%
+  mutate(across(.fns = as.factor)) %>%
+  summary()
+
+nzl_raw %>%
+  select(starts_with("G_")) %>%
+  pivot_longer(everything()) %>%
+  mutate(value = factor(value)) %>%
+  ggplot(aes(value)) +
+  geom_bar() +
+  facet_wrap(~name)
+```
+
+## News sources
+
+```{r}
+nzl_news <- nzl_raw %>%
+  select(starts_with(paste0("Q", 201:208))) %>%
+  pivot_longer(everything()) %>%
+  mutate(value = factor(value,
+                        levels = 1:5,
+                        labels = c("Daily", "Weekly", "Monthly",
+                                   "Less than monthly", "Never")))
+
+
+ggplot(nzl_news, aes(value)) +
+  geom_bar() +
+  facet_wrap(~name) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+nzl_news %>%
+  mutate(name = fct_collapse(name,
+                             "Old media" = c("Q201P", "Q202P", "Q203P"),
+                             "New media" = c("Q204P", "Q205P", "Q206P", "Q207P"),
+                             "Word of mouth" = c("Q208P"))) %>%
+  ggplot(aes(value)) +
+  geom_bar() +
+  facet_wrap(~name) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+```
+
 
 ## Correlations?
 
@@ -68,4 +125,3 @@ nzl_corr_trimmed <- nzl_corr_graph %>%
   scale_edge_colour_distiller(type = "div", palette = "RdBu", limits = c(-1, 1)) +
   theme_graph()
 ```
-
