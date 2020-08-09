@@ -1,8 +1,8 @@
 # wvs-nz
 
-A social sciences research project with @desirejam and @Xiner072.
+A social sciences research project with [@desirejam](https://github.com/desirejam) and [@Xiner072](https://github.com/Xiner072).
 
-We examine New Zealanders's response to the 2019 (Wave 7) [World Values Survey](https://www.worldvaluessurvey.org/).
+We examine New Zealanders' responses to the 2019 (Wave 7) [World Values Survey](https://www.worldvaluessurvey.org/).
 
 # Broad aims (to be refined)
 
