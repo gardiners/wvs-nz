@@ -1,8 +1,8 @@
 # Knit to GitHub markdown for viewing.
 
 library(here)
-library(rmarkdown)
+library(ezknitr)
 
-render(here("R/eda.Rmd"),
-       output_file = here("output/eda.md"),
-       output_format = "github_document")
+ezknit(file = here("R/eda.Rmd"),
+       out_dir = here("output"),
+       keep_html = FALSE)
