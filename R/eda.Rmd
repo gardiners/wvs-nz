@@ -40,6 +40,8 @@ pct_complete(nzl_missing)
 ```
 ### Demographics missingness?
 
+**Noteable**: patterns of missingness are structural. For example, people who have missing data for spouse education also have missing data for spouse income - because they don't have a spouse. NMAR. Imputation not sensible in these cases.
+
 ```{r fig.height=8}
 nzl_missing %>%
   select(starts_with(paste0("Q", 260:287))) %>%
@@ -51,12 +53,18 @@ nzl_missing %>%
 
 ## Rural vs city (small town vs bigger town)
 
+Overwhelmingly city respondants:
+
 ```{r}
 nzl_raw %>%
   select(H_SETTLEMENT, H_URBRURAL) %>%
   mutate(across(.fns = as.factor)) %>%
   summary()
+```
 
+However, a uniform-ish range of town sizes:
+
+```{r}
 nzl_raw %>%
   select(starts_with("G_")) %>%
   pivot_longer(everything()) %>%
@@ -98,7 +106,7 @@ nzl_news %>%
 
 ## Correlations?
 
-Scale everything and compare.
+Scale everything and compare. Religion seems to come out as being the strongest association with other values.
 
 ```{r}
 # Scale and compute Pearson's correlation
