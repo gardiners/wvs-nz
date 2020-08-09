@@ -15,6 +15,7 @@ library(here)
 library(naniar)
 library(tidygraph)
 library(ggraph)
+library(lubridate)
 ```
 
 ## File input
@@ -125,3 +126,19 @@ nzl_corr_trimmed <- nzl_corr_graph %>%
   scale_edge_colour_distiller(type = "div", palette = "RdBu", limits = c(-1, 1)) +
   theme_graph()
 ```
+
+
+## Interview date distribution
+
+Binwidth is weeks.
+
+```{r}
+nzl_raw %>%
+  select(J_INTDATE) %>%
+  mutate(J_INTDATE = ymd(J_INTDATE)) %>%
+  ggplot(aes(J_INTDATE)) +
+  geom_histogram(binwidth = 7) +
+  scale_x_date(breaks = "month", date_labels = "%B\n%Y") +
+  labs(x = "Interview date")
+```
+
