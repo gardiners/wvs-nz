@@ -3,6 +3,6 @@
 library(here)
 library(ezknitr)
 
-ezknit(file = here("R/eda.Rmd"),
+ezspin(file = here("R/eda.R"),
        out_dir = here("output"),
        keep_html = FALSE)

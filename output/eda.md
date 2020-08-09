@@ -8,6 +8,9 @@ output: html_document
 
 
 
+
+
+
 ```r
 library(tidyverse)
 library(here)
@@ -17,14 +20,18 @@ library(ggraph)
 library(lubridate)
 ```
 
+
 ## File input
+
 
 
 ```r
 nzl_raw <- read_csv(here("data/NZL.csv"))
 ```
 
+
 ## Missingness?
+
 
 
 ```r
@@ -57,9 +64,14 @@ pct_complete(nzl_missing)
 ```
 ## [1] 90.39989
 ```
+
 ### Demographics missingness?
 
-**Notable**: patterns of missingness are structural. For example, people who have missing data for spouse education also have missing data for spouse income - because they don't have a spouse. NMAR. Imputation not sensible in these cases.
+**Notable**: patterns of missingness are structural. For example, people who
+have missing data for spouse education also have missing data for spouse
+income - because they don't have a spouse. NMAR. Imputation not sensible in
+these cases.
+
 
 
 ```r
@@ -73,9 +85,11 @@ nzl_missing %>%
 
 
 
+
 ## Rural vs city (small town vs bigger town)
 
 Overwhelmingly city respondents:
+
 
 
 ```r
@@ -92,7 +106,9 @@ nzl_raw %>%
 ##  2 :170
 ```
 
+
 However, a uniform-ish range of town sizes:
+
 
 
 ```r
@@ -107,7 +123,9 @@ nzl_raw %>%
 
 ![plot of chunk unnamed-chunk-6](eda/unnamed-chunk-6-1.png)
 
+
 ## News sources
+
 
 
 ```r
@@ -143,9 +161,12 @@ nzl_news %>%
 ![plot of chunk unnamed-chunk-7](eda/unnamed-chunk-7-2.png)
 
 
+
 ## Correlations?
 
-Scale everything and compare. Religion seems to come out as being the strongest association with other values.
+Scale everything and compare. Religion seems to come out as being the
+strongest association with other values.
+
 
 
 ```r
@@ -192,9 +213,11 @@ nzl_corr_trimmed <- nzl_corr_graph %>%
 ![plot of chunk unnamed-chunk-8](eda/unnamed-chunk-8-1.png)
 
 
+
 ## Interview date distribution
 
 Binwidth is weeks.
+
 
 
 ```r
@@ -208,4 +231,5 @@ nzl_raw %>%
 ```
 
 ![plot of chunk unnamed-chunk-9](eda/unnamed-chunk-9-1.png)
+
 

@@ -1,32 +1,32 @@
----
-title: "Exploratory data analysis"
-author: "Sam Gardiner"
-date: "1 August 2020"
-output: html_document
----
-
-```{r setup, include=FALSE}
+#' ---
+#' title: "Exploratory data analysis"
+#' author: "Sam Gardiner"
+#' date: "1 August 2020"
+#' output: html_document
+#' ---
+#' 
+## ----setup, include=FALSE---------------------------------------------
 knitr::opts_chunk$set(echo = TRUE, message = FALSE, warn = FALSE)
-```
 
-```{r}
+#' 
+## ---------------------------------------------------------------------
 library(tidyverse)
 library(here)
 library(naniar)
 library(tidygraph)
 library(ggraph)
 library(lubridate)
-```
 
-## File input
-
-```{r}
+#' 
+#' ## File input
+#' 
+## ---------------------------------------------------------------------
 nzl_raw <- read_csv(here("data/NZL.csv"))
-```
 
-## Missingness?
-
-```{r}
+#' 
+#' ## Missingness?
+#' 
+## ---------------------------------------------------------------------
 nzl_missing <- nzl_raw %>%
   select(starts_with("Q")) %>%
   mutate(across(where(is.numeric), ~if_else(.x %in% -1:-5, NA_real_, .x)))
@@ -37,34 +37,37 @@ pct_complete_case(nzl_missing)
 pct_complete_var(nzl_missing)
 # Cell-wise completeness?
 pct_complete(nzl_missing)
-```
-### Demographics missingness?
 
-**Notable**: patterns of missingness are structural. For example, people who have missing data for spouse education also have missing data for spouse income - because they don't have a spouse. NMAR. Imputation not sensible in these cases.
-
-```{r fig.height=8}
+#' ### Demographics missingness?
+#' 
+#' **Notable**: patterns of missingness are structural. For example, people who
+#' have missing data for spouse education also have missing data for spouse
+#' income - because they don't have a spouse. NMAR. Imputation not sensible in
+#' these cases.
+#' 
+## ----fig.height=8-----------------------------------------------------
 nzl_missing %>%
   select(starts_with(paste0("Q", 260:287))) %>%
   gg_miss_upset(nsets = 10)
-```
 
-
-
-
-## Rural vs city (small town vs bigger town)
-
-Overwhelmingly city respondents:
-
-```{r}
+#' 
+#' 
+#' 
+#' 
+#' ## Rural vs city (small town vs bigger town)
+#' 
+#' Overwhelmingly city respondents:
+#' 
+## ---------------------------------------------------------------------
 nzl_raw %>%
   select(H_SETTLEMENT, H_URBRURAL) %>%
   mutate(across(.fns = as.factor)) %>%
   summary()
-```
 
-However, a uniform-ish range of town sizes:
-
-```{r}
+#' 
+#' However, a uniform-ish range of town sizes:
+#' 
+## ---------------------------------------------------------------------
 nzl_raw %>%
   select(starts_with("G_")) %>%
   pivot_longer(everything()) %>%
@@ -72,11 +75,11 @@ nzl_raw %>%
   ggplot(aes(value)) +
   geom_bar() +
   facet_wrap(~name)
-```
 
-## News sources
-
-```{r}
+#' 
+#' ## News sources
+#' 
+## ---------------------------------------------------------------------
 nzl_news <- nzl_raw %>%
   select(starts_with(paste0("Q", 201:208))) %>%
   pivot_longer(everything()) %>%
@@ -101,14 +104,15 @@ nzl_news %>%
   facet_wrap(~name) +
   theme(axis.text.x = element_text(angle = 90, hjust = 1))
 
-```
 
-
-## Correlations?
-
-Scale everything and compare. Religion seems to come out as being the strongest association with other values.
-
-```{r}
+#' 
+#' 
+#' ## Correlations?
+#' 
+#' Scale everything and compare. Religion seems to come out as being the
+#' strongest association with other values.
+#' 
+## ---------------------------------------------------------------------
 # Scale and compute Pearson's correlation
 nzl_corr <- nzl_missing %>%
   select(starts_with("Q")) %>%
@@ -133,14 +137,14 @@ nzl_corr_trimmed <- nzl_corr_graph %>%
   geom_node_text(aes(label = name, x = x * 1.15, y = y * 1.15), size = 2.5) +
   scale_edge_colour_distiller(type = "div", palette = "RdBu", limits = c(-1, 1)) +
   theme_graph()
-```
 
-
-## Interview date distribution
-
-Binwidth is weeks.
-
-```{r}
+#' 
+#' 
+#' ## Interview date distribution
+#' 
+#' Binwidth is weeks.
+#' 
+## ---------------------------------------------------------------------
 nzl_raw %>%
   select(J_INTDATE) %>%
   mutate(J_INTDATE = ymd(J_INTDATE)) %>%
@@ -148,5 +152,5 @@ nzl_raw %>%
   geom_histogram(binwidth = 7) +
   scale_x_date(breaks = "month", date_labels = "%B\n%Y") +
   labs(x = "Interview date")
-```
 
+#' 
