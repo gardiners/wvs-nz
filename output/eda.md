@@ -18,6 +18,7 @@ library(naniar)
 library(tidygraph)
 library(ggraph)
 library(lubridate)
+library(countrycode)
 ```
 
 
@@ -160,8 +161,6 @@ nzl_news %>%
 
 ![plot of chunk unnamed-chunk-7](eda/unnamed-chunk-7-2.png)
 
-
-
 ## Correlations?
 
 Scale everything and compare. Religion seems to come out as being the
@@ -192,7 +191,10 @@ nzl_corr_trimmed <- nzl_corr_graph %>%
   geom_node_point() +
   geom_edge_diagonal(aes(colour = weight)) +
   geom_node_text(aes(label = name, x = x * 1.15, y = y * 1.15), size = 2.5) +
-  scale_edge_colour_distiller(type = "div", palette = "RdBu", limits = c(-1, 1)) +
+  scale_edge_colour_distiller(type = "div",
+                              palette = "RdBu",
+                              limits = c(-1, 1),
+                              name = "r") +
   theme_graph()
 ```
 
@@ -212,24 +214,158 @@ nzl_corr_trimmed <- nzl_corr_graph %>%
 
 ![plot of chunk unnamed-chunk-8](eda/unnamed-chunk-8-1.png)
 
-
-
 ## Interview date distribution
 
 Binwidth is weeks.
 
 
+```r
+interview_dates <- nzl_raw %>%
+  select(J_INTDATE) %>%
+  mutate(J_INTDATE = ymd(J_INTDATE))
+```
+
+When were most of the responses received?
+
 
 ```r
-nzl_raw %>%
-  select(J_INTDATE) %>%
-  mutate(J_INTDATE = ymd(J_INTDATE)) %>%
-  ggplot(aes(J_INTDATE)) +
+halfway <- median(interview_dates$J_INTDATE)
+halfway
+```
+
+```
+## [1] "2019-08-20"
+```
+
+Is there a pattern to the response dates?
+
+
+```r
+ggplot(interview_dates, aes(J_INTDATE)) +
   geom_histogram(binwidth = 7) +
   scale_x_date(breaks = "month", date_labels = "%B\n%Y") +
+  geom_vline(xintercept = halfway,
+             linetype = "dashed") +
+  annotate("text",
+           x = halfway + 7,
+           y = 125,
+           label = paste("Half received by",
+                         strftime(halfway, "%d %b %Y")),
+           hjust = 0) +
   labs(x = "Interview date")
 ```
 
-![plot of chunk unnamed-chunk-9](eda/unnamed-chunk-9-1.png)
+![plot of chunk unnamed-chunk-11](eda/unnamed-chunk-11-1.png)
 
+## Demographic EDA
+Coding some factors and cleaning here. @TODO: move these to a separate data 
+cleaning script (after EDA).
+
+
+```r
+nzl_demogs <- nzl_raw %>%
+  select(starts_with(paste0("Q", 260:287))) %>%
+  mutate(Q260 = factor(Q260, levels = 1:2, labels = c("M", "F")),
+         Q261 = if_else(!between(Q261, 1889, 2019), NA_real_, Q261),
+         Q262 = if_else(!between(Q262, 18, 120), NA_real_, Q262),
+         across(c(Q263, Q264, Q265),
+                ~factor(.x, 1:2, labels = c("Native", "Immigrant"))),
+         across(c(Q266, Q267, Q268),
+                 ~countrycode(.x, origin = "iso3n", destination = "country.name")),
+         Q269 = factor(Q269, 1:2, labels = c("Citizen", "Non-citizen")))
+```
+
+```
+## Warning in countrycode(.x, origin = "iso3n", destination = "country.name"): Some values were not matched unambiguously: -5, 9999
+
+## Warning in countrycode(.x, origin = "iso3n", destination = "country.name"): Some values were not matched unambiguously: -5, 9999
+
+## Warning in countrycode(.x, origin = "iso3n", destination = "country.name"): Some values were not matched unambiguously: -5, 9999
+```
+
+Age-sex distribution?
+
+
+```r
+sex_table <- with(nzl_demogs, table(Q260))
+sex_table
+```
+
+```
+## Q260
+##   M   F 
+## 440 594
+```
+
+```r
+sex_table / (sum(sex_table))
+```
+
+```
+## Q260
+##         M         F 
+## 0.4255319 0.5744681
+```
+
+```r
+ggplot(nzl_demogs, aes(Q262, fill = Q260)) +
+  geom_histogram(position = position_dodge(), binwidth = 5) 
+```
+
+```
+## Warning: Removed 29 rows containing non-finite values (stat_bin).
+```
+
+![plot of chunk unnamed-chunk-13](eda/unnamed-chunk-13-1.png)
+
+```r
+ggplot(nzl_demogs, aes(Q260, Q262, fill = Q260)) +
+  geom_boxplot()
+```
+
+```
+## Warning: Removed 29 rows containing non-finite values (stat_boxplot).
+```
+
+![plot of chunk unnamed-chunk-13](eda/unnamed-chunk-13-2.png)
+
+Immigration and country of origin?
+Respondent:
+
+
+```r
+with(nzl_demogs, table(Q263))
+```
+
+```
+## Q263
+##    Native Immigrant 
+##       797       234
+```
+
+Mother
+
+
+```r
+with(nzl_demogs, table(Q264))
+```
+
+```
+## Q264
+##    Native Immigrant 
+##       855       166
+```
+
+Father
+
+
+```r
+with(nzl_demogs, table(Q265))
+```
+
+```
+## Q265
+##    Native Immigrant 
+##       837       172
+```
 

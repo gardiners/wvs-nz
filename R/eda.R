@@ -6,7 +6,7 @@
 #' ---
 #' 
 ## ----setup, include=FALSE---------------------------------------------
-knitr::opts_chunk$set(echo = TRUE, message = FALSE, warn = FALSE)
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warn = FALSE, fig.width = 10)
 
 #' 
 ## ---------------------------------------------------------------------
@@ -16,6 +16,7 @@ library(naniar)
 library(tidygraph)
 library(ggraph)
 library(lubridate)
+library(countrycode)
 
 #' 
 #' ## File input
@@ -105,14 +106,11 @@ nzl_news %>%
   theme(axis.text.x = element_text(angle = 90, hjust = 1))
 
 
-#' 
-#' 
 #' ## Correlations?
 #' 
 #' Scale everything and compare. Religion seems to come out as being the
 #' strongest association with other values.
 #' 
-## ---------------------------------------------------------------------
 # Scale and compute Pearson's correlation
 nzl_corr <- nzl_missing %>%
   select(starts_with("Q")) %>%
@@ -135,22 +133,77 @@ nzl_corr_trimmed <- nzl_corr_graph %>%
   geom_node_point() +
   geom_edge_diagonal(aes(colour = weight)) +
   geom_node_text(aes(label = name, x = x * 1.15, y = y * 1.15), size = 2.5) +
-  scale_edge_colour_distiller(type = "div", palette = "RdBu", limits = c(-1, 1)) +
+  scale_edge_colour_distiller(type = "div",
+                              palette = "RdBu",
+                              limits = c(-1, 1),
+                              name = "r") +
   theme_graph()
 
-#' 
-#' 
 #' ## Interview date distribution
 #' 
 #' Binwidth is weeks.
-#' 
-## ---------------------------------------------------------------------
-nzl_raw %>%
+interview_dates <- nzl_raw %>%
   select(J_INTDATE) %>%
-  mutate(J_INTDATE = ymd(J_INTDATE)) %>%
-  ggplot(aes(J_INTDATE)) +
+  mutate(J_INTDATE = ymd(J_INTDATE))
+
+#' When were most of the responses received?
+    
+halfway <- median(interview_dates$J_INTDATE)
+halfway
+
+#' Is there a pattern to the response dates?
+  
+ggplot(interview_dates, aes(J_INTDATE)) +
   geom_histogram(binwidth = 7) +
   scale_x_date(breaks = "month", date_labels = "%B\n%Y") +
+  geom_vline(xintercept = halfway,
+             linetype = "dashed") +
+  annotate("text",
+           x = halfway + 7,
+           y = 125,
+           label = paste("Half received by",
+                         strftime(halfway, "%d %b %Y")),
+           hjust = 0) +
   labs(x = "Interview date")
 
-#' 
+
+#' ## Demographic EDA
+
+#' Coding some factors and cleaning here. @TODO: move these to a separate data 
+#' cleaning script (after EDA).
+  
+nzl_demogs <- nzl_raw %>%
+  select(starts_with(paste0("Q", 260:287))) %>%
+  mutate(Q260 = factor(Q260, levels = 1:2, labels = c("M", "F")),
+         Q261 = if_else(!between(Q261, 1889, 2019), NA_real_, Q261),
+         Q262 = if_else(!between(Q262, 18, 120), NA_real_, Q262),
+         across(c(Q263, Q264, Q265),
+                ~factor(.x, 1:2, labels = c("Native", "Immigrant"))),
+         across(c(Q266, Q267, Q268),
+                 ~countrycode(.x, origin = "iso3n", destination = "country.name")),
+         Q269 = factor(Q269, 1:2, labels = c("Citizen", "Non-citizen")))
+  
+#' Age-sex distribution?
+
+sex_table <- with(nzl_demogs, table(Q260))
+sex_table
+sex_table / (sum(sex_table))
+
+ggplot(nzl_demogs, aes(Q262, fill = Q260)) +
+  geom_histogram(position = position_dodge(), binwidth = 5) 
+  
+ggplot(nzl_demogs, aes(Q260, Q262, fill = Q260)) +
+  geom_boxplot()
+  
+#' Immigration and country of origin?
+
+#' Respondent:
+with(nzl_demogs, table(Q263))
+
+#' Mother
+with(nzl_demogs, table(Q264))
+
+#' Father
+with(nzl_demogs, table(Q265))
+
+
