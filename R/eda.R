@@ -4,12 +4,11 @@
 #' date: "1 August 2020"
 #' output: html_document
 #' ---
-#' 
-## ----setup, include=FALSE---------------------------------------------
+
+#- setup
 knitr::opts_chunk$set(echo = TRUE, message = FALSE, warn = FALSE, fig.width = 10)
 
-#' 
-## ---------------------------------------------------------------------
+#- init
 library(tidyverse)
 library(here)
 library(naniar)
@@ -205,5 +204,4 @@ with(nzl_demogs, table(Q264))
 
 #' Father
 with(nzl_demogs, table(Q265))
-
 

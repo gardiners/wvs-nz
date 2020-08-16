@@ -6,10 +6,9 @@ output: html_document
 ---
 
 
-
-
-
-
+```r
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warn = FALSE, fig.width = 10)
+```
 
 ```r
 library(tidyverse)
@@ -81,7 +80,7 @@ nzl_missing %>%
   gg_miss_upset(nsets = 10)
 ```
 
-![plot of chunk unnamed-chunk-4](eda/unnamed-chunk-4-1.png)
+![plot of chunk unnamed-chunk-3](eda/unnamed-chunk-3-1.png)
 
 
 
@@ -122,7 +121,7 @@ nzl_raw %>%
   facet_wrap(~name)
 ```
 
-![plot of chunk unnamed-chunk-6](eda/unnamed-chunk-6-1.png)
+![plot of chunk unnamed-chunk-5](eda/unnamed-chunk-5-1.png)
 
 
 ## News sources
@@ -145,7 +144,7 @@ ggplot(nzl_news, aes(value)) +
   theme(axis.text.x = element_text(angle = 90, hjust = 1))
 ```
 
-![plot of chunk unnamed-chunk-7](eda/unnamed-chunk-7-1.png)
+![plot of chunk unnamed-chunk-6](eda/unnamed-chunk-6-1.png)
 
 ```r
 nzl_news %>%
@@ -159,7 +158,7 @@ nzl_news %>%
   theme(axis.text.x = element_text(angle = 90, hjust = 1))
 ```
 
-![plot of chunk unnamed-chunk-7](eda/unnamed-chunk-7-2.png)
+![plot of chunk unnamed-chunk-6](eda/unnamed-chunk-6-2.png)
 
 ## Correlations?
 
@@ -199,20 +198,22 @@ nzl_corr_trimmed <- nzl_corr_graph %>%
 ```
 
 ```
-## Warning in grid.Call(C_textBounds, as.graphicsAnnot(x$label), x$x,
-## x$y, : font family not found in Windows font database
+## Warning in grid.Call(C_stringMetric, as.graphicsAnnot(x$label)): font family not
+## found in Windows font database
 
-## Warning in grid.Call(C_textBounds, as.graphicsAnnot(x$label), x$x,
-## x$y, : font family not found in Windows font database
-
-## Warning in grid.Call(C_textBounds, as.graphicsAnnot(x$label), x$x,
-## x$y, : font family not found in Windows font database
-
-## Warning in grid.Call(C_textBounds, as.graphicsAnnot(x$label), x$x,
-## x$y, : font family not found in Windows font database
+## Warning in grid.Call(C_stringMetric, as.graphicsAnnot(x$label)): font family not
+## found in Windows font database
 ```
 
-![plot of chunk unnamed-chunk-8](eda/unnamed-chunk-8-1.png)
+```
+## Warning in grid.Call(C_textBounds, as.graphicsAnnot(x$label), x$x, x$y, : font
+## family not found in Windows font database
+
+## Warning in grid.Call(C_textBounds, as.graphicsAnnot(x$label), x$x, x$y, : font
+## family not found in Windows font database
+```
+
+![plot of chunk unnamed-chunk-7](eda/unnamed-chunk-7-1.png)
 
 ## Interview date distribution
 
@@ -255,7 +256,7 @@ ggplot(interview_dates, aes(J_INTDATE)) +
   labs(x = "Interview date")
 ```
 
-![plot of chunk unnamed-chunk-11](eda/unnamed-chunk-11-1.png)
+![plot of chunk unnamed-chunk-10](eda/unnamed-chunk-10-1.png)
 
 ## Demographic EDA
 Coding some factors and cleaning here. @TODO: move these to a separate data 
@@ -316,7 +317,7 @@ ggplot(nzl_demogs, aes(Q262, fill = Q260)) +
 ## Warning: Removed 29 rows containing non-finite values (stat_bin).
 ```
 
-![plot of chunk unnamed-chunk-13](eda/unnamed-chunk-13-1.png)
+![plot of chunk unnamed-chunk-12](eda/unnamed-chunk-12-1.png)
 
 ```r
 ggplot(nzl_demogs, aes(Q260, Q262, fill = Q260)) +
@@ -327,7 +328,7 @@ ggplot(nzl_demogs, aes(Q260, Q262, fill = Q260)) +
 ## Warning: Removed 29 rows containing non-finite values (stat_boxplot).
 ```
 
-![plot of chunk unnamed-chunk-13](eda/unnamed-chunk-13-2.png)
+![plot of chunk unnamed-chunk-12](eda/unnamed-chunk-12-2.png)
 
 Immigration and country of origin?
 Respondent:
