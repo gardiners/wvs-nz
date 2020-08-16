@@ -2,7 +2,7 @@
 
 A social sciences research project with [@desirejam](https://github.com/desirejam) and [@Xiner072](https://github.com/Xiner072).
 
-We examine New Zealanders' responses to the 2019 (Wave 7) [World Values Survey](https://www.worldvaluessurvey.org/).
+We examine New Zealanders' responses to the 2019 (Wave 7) [World Values Survey](https://www.worldvaluessurvey.org/). [Rendered output is available](output/).
 
 # Broad aims (to be refined)
 
