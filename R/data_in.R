@@ -22,7 +22,7 @@ match_questions <- function(q_number, prefix = "Q", suffix = "[a-zA-Z]?$") {
 nzl_raw <- read_spss(here("data", "WVS_Wave_7_New_Zealand_Spss_v1.4.sav"),
                      user_na = TRUE)
 
-#' Variable coding
+#' # Variable coding
 #'
 #' Decide which of our questions are ordinal, on a 10-point scale (and
 #' therefore may end up being treated as continuous), continuous or categorical.
@@ -62,7 +62,6 @@ nzl_coded <- nzl_raw %>%
 #'  Other data cleaning operations will go here.
 
 #' # Serialise for other scripts
-
 saveRDS(nzl_coded, here("data", "nzl_coded.RDS"))
 
 
