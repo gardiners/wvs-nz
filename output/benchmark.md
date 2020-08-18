@@ -130,11 +130,6 @@ ks.test(wvs_age$age, census_age_expanded)
 ```
 
 ```
-## Warning in ks.test(wvs_age$age, census_age_expanded): p-value will be
-## approximate in the presence of ties
-```
-
-```
 ## 
 ## 	Two-sample Kolmogorov-Smirnov test
 ## 
