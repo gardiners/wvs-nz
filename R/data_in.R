@@ -25,7 +25,7 @@ nzl_raw <- read_spss(here("data", "WVS_Wave_7_New_Zealand_Spss_v1.4.sav"),
 #' # Variable coding
 #'
 #' Decide which of our questions are ordinal, on a 10-point scale (and
-#' therefore may end up being treated as continuous), continuous or categorical.
+#' therefore may end up being treated as continuous), continuous or nominal.
 q_numbers <- lst(
   ordinal = c(1:6, 27:47, 51:55, 58:89, 113:118, 121, 131:138, 141:143, 146:148,
               169:172, 196:199, 201:208, 221, 222, 224:239, 253, 255:259, 275:278, 287),
@@ -34,8 +34,8 @@ q_numbers <- lst(
   # These are sort-of ordinal but will need manual coding. They are currently
   # treated as categorical:
   badly_ordered = c(119, 221, 222, 254),
-  # Everything else is categorical (including binary)
-  categorical = (1:290)[!(1:290 %in% c(ordinal, scale_10_point, continuous))]
+  # Everything else is nominal (including binary)
+  nominal = (1:290)[!(1:290 %in% c(ordinal, scale_10_point, continuous))]
 )
 
 #' Some of the variable names have suffixes in the NZ dataset. So, we build
@@ -55,7 +55,7 @@ nzl_coded <- nzl_raw %>%
   drop_unused_value_labels() %>%
   # Covert labels to factors ready for analysis
   mutate(across(matches(q_names$ordinal), as_factor, ordered = TRUE),
-         across(matches(q_names$categorical), as_factor))
+         across(matches(q_names$nominal), as_factor))
 
 #' # Data cleaning
 #' 
