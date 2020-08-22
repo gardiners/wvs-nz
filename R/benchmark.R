@@ -56,20 +56,18 @@ census_sex <- census_datasets$sex
 
 #' @TODO: Repeat with cleaned WVS dataset when available.
 
-nzl_raw <- read_csv(file = here("data/NZL.csv")) %>%
-  code_missing()
+nzl_coded <- readRDS(here("data", "nzl_coded.RDS"))
 
 #' Age:
 
-wvs_age <- nzl_raw %>%
+wvs_age <- nzl_coded %>%
   select(age = Q262) %>%
   filter(age > 0 & age <= 120)
 
 #' Sex:
 
-wvs_sex <- nzl_raw %>%
-  select(sex = Q260) %>%
-  mutate(sex = factor(sex, levels = 1:2, labels = c("Male", "Female")))
+wvs_sex <- nzl_coded %>%
+  select(sex = Q260)
 
 #' # Checks for representativeness
 
@@ -121,9 +119,10 @@ wvs_sex_tab <- wvs_sex %>%
   summarise(n = n()) %>%
   mutate(freq = n / sum(n))
 
-rbind(cbind(census_sex_tab, data_source = "Census"),
-      cbind(wvs_sex_tab, data_source = "WVS")) %>%
-  ggplot(aes(freq, data_source, fill = sex)) +
+combo_sex <- rbind(cbind(census_sex_tab, data_source = "Census"),
+                   cbind(wvs_sex_tab, data_source = "WVS"))
+
+ggplot(combo_sex, aes(freq, data_source, fill = sex)) +
   geom_bar(stat = "identity", width = 1, colour = "white") +
   geom_text(aes(label = round(freq, 3)),
             position = position_stack(vjust = 0.5)) +
