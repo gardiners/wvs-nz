@@ -198,19 +198,19 @@ nzl_corr_trimmed <- nzl_corr_graph %>%
 ```
 
 ```
-## Warning in grid.Call(C_stringMetric, as.graphicsAnnot(x$label)): font family not
-## found in Windows font database
+## Warning in grid.Call(C_stringMetric, as.graphicsAnnot(x$label)): font
+## family not found in Windows font database
 
-## Warning in grid.Call(C_stringMetric, as.graphicsAnnot(x$label)): font family not
-## found in Windows font database
+## Warning in grid.Call(C_stringMetric, as.graphicsAnnot(x$label)): font
+## family not found in Windows font database
 ```
 
 ```
-## Warning in grid.Call(C_textBounds, as.graphicsAnnot(x$label), x$x, x$y, : font
-## family not found in Windows font database
+## Warning in grid.Call(C_textBounds, as.graphicsAnnot(x$label), x$x,
+## x$y, : font family not found in Windows font database
 
-## Warning in grid.Call(C_textBounds, as.graphicsAnnot(x$label), x$x, x$y, : font
-## family not found in Windows font database
+## Warning in grid.Call(C_textBounds, as.graphicsAnnot(x$label), x$x,
+## x$y, : font family not found in Windows font database
 ```
 
 ![plot of chunk unnamed-chunk-7](eda/unnamed-chunk-7-1.png)
