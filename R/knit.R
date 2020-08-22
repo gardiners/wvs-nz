@@ -4,11 +4,8 @@ library(here)
 library(ezknitr)
 library(tidyverse)
 
-# Scripts to render (don't render self!)
-scripts <- list.files(here("R"),
-                      pattern = r"(\.R$)",
-                      full.names = TRUE) %>%
-  discard(~str_ends(.x, "knit.R"))
+# Scripts to render
+scripts <- c("eda.R", "benchmark.R") %>% here("R", .)
 
 # Output directory
 output <- here("output")
