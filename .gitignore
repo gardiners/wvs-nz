@@ -5,5 +5,3 @@
 
 # Ignore most rendered previews and intermediate output:
 *.pdf
-R/*_files/
-R/*.md

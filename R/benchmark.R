@@ -11,11 +11,10 @@
 #- setup, echo = FALSE
 knitr::opts_chunk$set(echo = TRUE,
                       message = FALSE,
-                      warn = FALSE,
-                      fig.width = 8)
+                      warn = FALSE)
 
 #- init
-library(tidyverse, quietly = TUE)
+library(tidyverse, quietly = TRUE)
 library(here, quietly = TRUE)
 
 # Helper functions for data cleaning
@@ -32,7 +31,7 @@ census_data_dir <- "data/2018-Census-totals-by-topic-national-highlights"
 
 #' Load all of the census highlights into a list of dataframes and perform data
 #' cleaning common to all.
-census_datasets <- list.files(here(census_data_dir)) %>%
+census <- list.files(here(census_data_dir)) %>%
   set_names(str_replace_all,
             c("-2018-census-csv.csv$" = "",
               "-" = "_")) %>%
@@ -45,13 +44,16 @@ census_datasets <- list.files(here(census_data_dir)) %>%
   })
 
 #' Age:
-census_age <- census_datasets$age_single_years %>%
+census_age <- census$age_single_years %>%
   transmute(age = as.integer(Code),
-         n)
+            n)
 
 #' Sex:
-census_sex <- census_datasets$sex
-  
+census_sex <- census$sex
+
+#' Education
+census_education <- census$post_school_qualification_level_of_attainment
+
 #' ## WVS data
 
 #' @TODO: Repeat with cleaned WVS dataset when available.
@@ -59,15 +61,17 @@ census_sex <- census_datasets$sex
 nzl_coded <- readRDS(here("data", "nzl_coded.RDS"))
 
 #' Age:
-
 wvs_age <- nzl_coded %>%
   select(age = Q262) %>%
   filter(age > 0 & age <= 120)
 
 #' Sex:
-
 wvs_sex <- nzl_coded %>%
   select(sex = Q260)
+
+#' Education:
+wvs_education <- nzl_coded %>%
+  select(education = Q275)
 
 #' # Checks for representativeness
 
@@ -102,6 +106,7 @@ ks.test(wvs_age$age, census_age_expanded)
 #' even considering the removal of under-18s. The age distribution of
 #' respondents is somewhat shifted to the right compared to the population -
 #' they are older than expected if they were a representative sample.
+
 #'
 #' ## Sex
 # ------------------------------------------------------------------------------
@@ -115,8 +120,7 @@ census_sex_tab <- census_sex %>%
 
 wvs_sex_tab <- wvs_sex %>%
   na.omit() %>%
-  group_by(sex) %>%
-  summarise(n = n()) %>%
+  count(sex) %>%
   mutate(freq = n / sum(n))
 
 combo_sex <- rbind(cbind(census_sex_tab, data_source = "Census"),
@@ -139,6 +143,53 @@ prop.test(x = t(wvs_sex_tab$n),
 #' The sample sex proportions are not representative of the population. Females
 #' are over-represented in the survey responses.
 
+#'
+#' ## Education
+# ------------------------------------------------------------------------------
+#' Does education level differ between the sample and the census population? It
+#' is difficult to directly compare, as the datasets code different education
+#' levels. So, we code to secondary vs. post-secondary.
+#' 
+
+#- education-comparison, fig.cap = "Education proportions in census and survey datasets."
+# Code both census and wvs datasets to binary for post-secondary education.
+census_educ_tab <-  census_education %>%
+  transmute(post_school = case_when(Code == "00" ~ FALSE,
+                                    as.integer(Code) %in% 2:10 ~ TRUE),
+            n) %>%
+  count(post_school) %>%
+  na.omit() %>%
+  mutate(freq = n / sum(n))
+
+wvs_educ_tab <- wvs_education %>%
+  mutate(education = as.integer(education),
+         post_school = case_when(education <= 4 ~ FALSE,
+                                 education > 4 ~ TRUE)) %>%
+  count(post_school) %>%
+  na.omit() %>%
+  mutate(freq = n / sum(n))
+
+combo_educ <- rbind(cbind(census_educ_tab, data_source = "Census"),
+                    cbind(wvs_educ_tab, data_source = "WVS"))
+
+ggplot(combo_educ, aes(freq, data_source, fill = post_school)) +
+  geom_bar(stat = "identity", width = 1, colour = "white") +
+  geom_text(aes(label = round(freq, 3)),
+            position = position_stack(vjust = 0.5)) +
+  scale_fill_discrete(labels = c("Secondary", "Post-secondary")) +
+  guides(fill = guide_legend(reverse = TRUE)) +
+  theme(legend.position = "top", legend.title = element_blank())
+
+#' Once again, these look to be markedly different distributions. We can test:
+
+prop.test(x = t(wvs_educ_tab$n),
+          p = census_educ_tab$freq[1])
+
+#' The survey sample is not representative. The survey respondents are more
+#' likely to have completed post-secondary education compared to the general
+#' population.
+
+#'
 #' ## Immigration and birthplace
 # ------------------------------------------------------------------------------
 
