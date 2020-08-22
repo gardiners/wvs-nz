@@ -21,12 +21,48 @@ library(here, quietly = TRUE)
 source(here("R", "helpers.R"))
 
 # Universal ggplot theming 
-theme_set(theme_bw())
+theme_set(theme_minimal())
 
+
+#' # Utility functions
+# ------------------------------------------------------------------------------
+#' Add a frequency column, using a count column.
+add_freq <- function(data, count_col = n) {
+  mutate(data, freq = {{ count_col }} / sum({{ count_col }}))
+}
+
+#' Combine two datasets, denoting their sources in a new column "data_source".
+combine_sets <- function(x, y, x_name = "Census", y_name = "WVS") {
+  if(any(names(x) != names(y))) error("Column names must match.")
+  rbind(
+    cbind(x, data_source = x_name),
+    cbind(y, data_source = y_name)
+  )
+}
+
+#' Build a stacked barplot that compares two datasets on a single factor.
+#'
+#' @param data A data frame.
+#' @param factor_col The factor on which to stack the bars. Will be assigned to
+#'   the fill aesthetic.
+#' @param source_indicator A factor indicating which dataset the observation
+#'   comes from.
+comparison_barplot <- function(data, factor_col, source_indicator = data_source) {
+  ggplot(data, aes(freq, {{source_indicator}}, fill = {{factor_col}})) +
+    geom_bar(stat = "identity", width = 1, colour = "white") +
+    geom_text(aes(label = round(freq, 3)),
+              position = position_stack(vjust = 0.5)) +
+    guides(fill = guide_legend(reverse = TRUE)) +
+    theme(legend.position = "top", legend.title = element_blank())
+}
+
+          
 #' # Datasets
 #' ## Census
-#' The dataset in use here is the [New Zealand 2018 Census totals by topic – national
-#' highlights (updated)](https://www.stats.govt.nz/information-releases/2018-census-totals-by-topic-national-highlights-updated).
+# ------------------------------------------------------------------------------
+#' The dataset in use here is the [New Zealand 2018 Census totals by topic –
+#' national highlights
+#' (updated)](https://www.stats.govt.nz/information-releases/2018-census-totals-by-topic-national-highlights-updated).
 census_data_dir <- "data/2018-Census-totals-by-topic-national-highlights"
 
 #' Load all of the census highlights into a list of dataframes and perform data
@@ -51,12 +87,14 @@ census_age <- census$age_single_years %>%
 #' Sex:
 census_sex <- census$sex
 
-#' Education
+#' Education:
 census_education <- census$post_school_qualification_level_of_attainment
 
-#' ## WVS data
+#' Place of birth:
+census_birth <- census$birthplace
 
-#' @TODO: Repeat with cleaned WVS dataset when available.
+#' ## WVS data
+# ------------------------------------------------------------------------------
 
 nzl_coded <- readRDS(here("data", "nzl_coded.RDS"))
 
@@ -72,6 +110,10 @@ wvs_sex <- nzl_coded %>%
 #' Education:
 wvs_education <- nzl_coded %>%
   select(education = Q275)
+
+#' Place of birth:
+wvs_birth <- nzl_coded %>%
+  select(country = Q266)
 
 #' # Checks for representativeness
 
@@ -99,7 +141,6 @@ ggplot(combo_age, aes(age, fill = data_source)) +
 
 #' These appear to be different distributions. Test more formally with
 #' Kolmogorov-Smirnov test:
-
 ks.test(wvs_age$age, census_age_expanded)
 
 #' The distribution of ages of survey respondents does not match the population,
@@ -116,27 +157,20 @@ ks.test(wvs_age$age, census_age_expanded)
 #- sex-comparison, fig.cap = "Sex proportions in census and survey datasets."
 census_sex_tab <- census_sex %>%
   select(sex = Sex, n) %>%
-  mutate(freq = n / sum(n))
+  add_freq()
 
 wvs_sex_tab <- wvs_sex %>%
   na.omit() %>%
   count(sex) %>%
-  mutate(freq = n / sum(n))
+  add_freq()
 
-combo_sex <- rbind(cbind(census_sex_tab, data_source = "Census"),
-                   cbind(wvs_sex_tab, data_source = "WVS"))
-
-ggplot(combo_sex, aes(freq, data_source, fill = sex)) +
-  geom_bar(stat = "identity", width = 1, colour = "white") +
-  geom_text(aes(label = round(freq, 3)),
-            position = position_stack(vjust = 0.5)) +
-  guides(fill = guide_legend(reverse = TRUE)) +
-  theme(legend.position = "top", legend.title = element_blank())
+# Combine and plot
+combo_sex <- combine_sets(census_sex_tab, wvs_sex_tab)
+comparison_barplot(combo_sex, sex)
 
 #' These appear to be different distributions. Test more formally with a
 #' one-sample test of proportions, treating the census data as population
 #' proportion:
-
 prop.test(x = t(wvs_sex_tab$n),
           p = census_sex_tab$freq[1])
 
@@ -159,7 +193,7 @@ census_educ_tab <-  census_education %>%
             n) %>%
   count(post_school) %>%
   na.omit() %>%
-  mutate(freq = n / sum(n))
+  add_freq()
 
 wvs_educ_tab <- wvs_education %>%
   mutate(education = as.integer(education),
@@ -167,21 +201,14 @@ wvs_educ_tab <- wvs_education %>%
                                  education > 4 ~ TRUE)) %>%
   count(post_school) %>%
   na.omit() %>%
-  mutate(freq = n / sum(n))
+  add_freq()
 
-combo_educ <- rbind(cbind(census_educ_tab, data_source = "Census"),
-                    cbind(wvs_educ_tab, data_source = "WVS"))
-
-ggplot(combo_educ, aes(freq, data_source, fill = post_school)) +
-  geom_bar(stat = "identity", width = 1, colour = "white") +
-  geom_text(aes(label = round(freq, 3)),
-            position = position_stack(vjust = 0.5)) +
-  scale_fill_discrete(labels = c("Secondary", "Post-secondary")) +
-  guides(fill = guide_legend(reverse = TRUE)) +
-  theme(legend.position = "top", legend.title = element_blank())
+# Combine and plot:
+combo_educ <- combine_sets(census_educ_tab, wvs_educ_tab)
+comparison_barplot(combo_educ, post_school) +
+  scale_fill_discrete(labels = c("Secondary", "Post-secondary"))
 
 #' Once again, these look to be markedly different distributions. We can test:
-
 prop.test(x = t(wvs_educ_tab$n),
           p = census_educ_tab$freq[1])
 
@@ -194,7 +221,50 @@ prop.test(x = t(wvs_educ_tab$n),
 # ------------------------------------------------------------------------------
 
 #' Did immigrants to New Zealand respond to the survey at the same rate they
-#' exist in the population?
+#' exist in the population? Given that the survey sampling frame is drawn from
+#' the New Zealand electoral roll, which comprises only citizens, it seems
+#' unlikely that immigrants are well-represented in the survey respondents.
+#'
+#' The census captures the names of all countries of birth; however the survey
+#' only records New Zealand, United Kingdom and Other. We therefore recode the
+#' census data to match this scheme.
 
+wvs_birth_tab <- wvs_birth %>%
+  count(country) %>%
+  na.omit() %>%
+  add_freq() %>%
+  arrange(freq)
 
+# Combine various census countries-of-origin into United Kingdom level:
+census_birth_tab <- census_birth %>%
+  mutate(country = case_when(as.integer(Code) %in% c(0, 9999) ~ NA_character_,
+                             Birthplace == "New Zealand" ~ "New Zealand",
+                             Birthplace %in% c("England",
+                                               "Scotland",
+                                               "Northern Ireland",
+                                               "Wales",
+                                               "Channel Islands",
+                                               "Isle of Man",
+                                               "Gibraltar",
+                                               "United Kingdom (not further defined)")
+                             ~ "United Kingdom",
+                             TRUE ~ "Other")) %>% 
+  count(country) %>%
+  na.omit() %>%
+  add_freq() %>%
+  arrange(freq)
 
+# Combine and plot:
+combo_birth <- combine_sets(census_birth_tab, wvs_birth_tab)
+comparison_barplot(combo_birth, factor_col = country)
+
+#' These again appear to be different distributions. We can check formally:
+birth_stat <- chisq.test(x = wvs_birth_tab$n, p = census_birth_tab$freq)
+birth_stat$expected
+birth_stat$observed
+birth_stat
+
+#' Once again, we find that the survey sample is not representative of the
+#' population. Native-born New Zealanders and those born in the UK are slightly
+#' over-represented in the sample, while those with other origins are
+#' under-represented.
