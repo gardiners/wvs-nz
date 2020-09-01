@@ -28,7 +28,7 @@ On continuous responses, considered jointly:
 
 ```r
 wvs_numeric <- wvs %>%
-  select(where(is.numeric), H_URBRURAL, -Q289CS, -Q261) %>%
+  select(where(is.numeric), H_URBRURAL, -Q288R, -Q289CS, -Q261) %>%
   na.omit()
 
 wvs_response <- wvs_numeric %>%
@@ -41,7 +41,7 @@ summary(wvs_manova, test = "Hotelling")
 
 ```
 ##                         Df Hotelling-Lawley approx F num Df den Df Pr(>F)
-## wvs_numeric$H_URBRURAL   1          0.17154   1.1753     54    370 0.1977
+## wvs_numeric$H_URBRURAL   1          0.17145   1.2002     53    371 0.1713
 ## Residuals              423
 ```
 
@@ -60,6 +60,7 @@ ggplot(wvs_numeric_corr, aes(var1, var2, fill = value)) +
   geom_raster() +
   scale_fill_viridis_c() +
   theme(axis.text.x = element_text(angle = -90, hjust = 0, vjust = 0.5)) +
+  labs(x = "", y = "") +
   coord_equal()
 ```
 

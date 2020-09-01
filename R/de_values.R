@@ -25,7 +25,7 @@ wvs <- readRDS(here("data", "nzl_coded.RDS")) %>%
 #' 
 #' On continuous responses, considered jointly:
 wvs_numeric <- wvs %>%
-  select(where(is.numeric), H_URBRURAL, -Q289CS, -Q261) %>%
+  select(where(is.numeric), H_URBRURAL, -Q288R, -Q289CS, -Q261) %>%
   na.omit()
 
 wvs_response <- wvs_numeric %>%
@@ -47,6 +47,7 @@ ggplot(wvs_numeric_corr, aes(var1, var2, fill = value)) +
   geom_raster() +
   scale_fill_viridis_c() +
   theme(axis.text.x = element_text(angle = -90, hjust = 0, vjust = 0.5)) +
+  labs(x = "", y = "") +
   coord_equal()
 
 #' ## Can we predict urban-rural status?
