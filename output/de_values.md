@@ -13,6 +13,12 @@ library(here)
 library(broom)
 library(ordinal)
 library(tidyverse)
+library(ggExtra)
+
+theme_set(theme_minimal())
+theme_rotate_x <- theme(axis.text.x = element_text(angle = -90,
+                                                   hjust = 0,
+                                                   vjust = 0.5))
 
 wvs <- readRDS(here("data", "nzl_coded.RDS")) %>%
   select(H_URBRURAL, matches("Q[0-9]+")) %>%
@@ -23,7 +29,7 @@ wvs <- readRDS(here("data", "nzl_coded.RDS")) %>%
 
 ## Are urban and rural respondents different?
 
-On continuous responses, considered jointly:
+On continuous responses, considered jointly.
 
 
 ```r
@@ -34,7 +40,79 @@ wvs_numeric <- wvs %>%
 wvs_response <- wvs_numeric %>%
   select(-H_URBRURAL) %>%
   as.matrix()
+```
 
+### PCA
+
+
+```r
+wvs_pca <- prcomp(wvs_response, center = TRUE, scale = FALSE)
+summary(wvs_pca)$importance[,1:5]
+```
+
+```
+##                             PC1      PC2      PC3      PC4      PC5
+## Standard deviation     15.17852 6.854928 4.809897 4.059524 3.254256
+## Proportion of Variance  0.47901 0.097700 0.048100 0.034260 0.022020
+## Cumulative Proportion   0.47901 0.576710 0.624810 0.659080 0.681100
+```
+
+Scree plot:
+
+
+```r
+wvs_pca_long <- t(summary(wvs_pca)$importance) %>%
+  as_tibble(rownames = "Component") %>%
+  mutate(Eigenvalue = `Standard deviation`^2)
+
+ggplot(wvs_pca_long, aes(reorder(Component, -Eigenvalue), Eigenvalue)) +
+  geom_point() +
+  geom_hline(yintercept = mean(wvs_pca_long$Eigenvalue), linetype = "dashed") +
+  theme_rotate_x +
+  labs(x = "Component")
+```
+
+![plot of chunk unnamed-chunk-3](de_values/unnamed-chunk-3-1.png)
+
+Reprojected observations:
+
+
+```r
+wvs_rotated <- data.frame(H_URBRURAL = wvs_numeric$H_URBRURAL,
+                          wvs_pca$x)
+
+p <- ggplot(wvs_rotated, aes(PC1, PC2, colour = H_URBRURAL, fill = H_URBRURAL)) +
+  geom_point() +
+  labs(x = "PC1 - 47.9%", y = "PC2 - 9.7%") +
+  theme(legend.position = "bottom")
+ggMarginal(p, groupColour = TRUE)
+```
+
+![plot of chunk reprojection](de_values/reprojection-1.png)
+
+Loadings  
+
+
+```r
+wvs_loadings <- wvs_pca$rotation %>%
+  as_tibble(rownames = "Variable") %>%
+  pivot_longer(-Variable)
+```
+
+```r
+wvs_loadings %>%
+  filter(name %in% paste0("PC", 1:2)) %>%
+  ggplot(aes(value, Variable)) +
+  geom_bar(stat = "identity") +
+  facet_wrap(~name)
+```
+
+![plot of chunk loadings-plot](de_values/loadings-plot-1.png)
+
+### MANOVA
+
+
+```r
 wvs_manova <- manova(wvs_response ~ wvs_numeric$H_URBRURAL)
 summary(wvs_manova, test = "Hotelling")
 ```
@@ -59,7 +137,7 @@ wvs_numeric_corr <- cor(wvs_response)^2 %>%
 ggplot(wvs_numeric_corr, aes(var1, var2, fill = value)) +
   geom_raster() +
   scale_fill_viridis_c() +
-  theme(axis.text.x = element_text(angle = -90, hjust = 0, vjust = 0.5)) +
+  theme_rotate_x +
   labs(x = "", y = "") +
   coord_equal()
 ```
@@ -100,7 +178,7 @@ rur_model_summaries %>%
   geom_point()
 ```
 
-![plot of chunk unnamed-chunk-4](de_values/unnamed-chunk-4-1.png)
+![plot of chunk unnamed-chunk-8](de_values/unnamed-chunk-8-1.png)
 
 The most predictive variables are:
 
