@@ -9,11 +9,17 @@
 knitr::opts_chunk$set(echo = TRUE, message = FALSE, warn = FALSE, fig.width = 10)
 
 #- init
-library(tidyverse)
+library(mlogit)
 library(here)
 library(broom)
-library(caret)
-library(doParallel)
+library(ordinal)
+library(tidyverse)
+library(ggExtra)
+
+theme_set(theme_minimal())
+theme_rotate_x <- theme(axis.text.x = element_text(angle = -90,
+                                                   hjust = 0,
+                                                   vjust = 0.5))
 
 wvs <- readRDS(here("data", "nzl_coded.RDS")) %>%
   select(H_URBRURAL, matches("Q[0-9]+")) %>%
@@ -21,15 +27,84 @@ wvs <- readRDS(here("data", "nzl_coded.RDS")) %>%
                              levels = 1:2,
                              labels = c("Urban", "Rural")))
 
+#' ## Are urban and rural respondents different?
+#' 
+#' On continuous responses, considered jointly.
+
+wvs_numeric <- wvs %>%
+  select(where(is.numeric), H_URBRURAL, -Q288R, -Q289CS, -Q261) %>%
+  na.omit()
+
+wvs_response <- wvs_numeric %>%
+  select(-H_URBRURAL) %>%
+  as.matrix()
+
+#' ### PCA
+wvs_pca <- prcomp(wvs_response, center = TRUE, scale = FALSE)
+summary(wvs_pca)$importance[,1:5]
+
+#' Scree plot:
+wvs_pca_long <- t(summary(wvs_pca)$importance) %>%
+  as_tibble(rownames = "Component") %>%
+  mutate(Eigenvalue = `Standard deviation`^2)
+
+ggplot(wvs_pca_long, aes(reorder(Component, -Eigenvalue), Eigenvalue)) +
+  geom_point() +
+  geom_hline(yintercept = mean(wvs_pca_long$Eigenvalue), linetype = "dashed") +
+  theme_rotate_x +
+  labs(x = "Component")
+
+#' Reprojected observations:
+#- reprojection
+wvs_rotated <- data.frame(H_URBRURAL = wvs_numeric$H_URBRURAL,
+                          wvs_pca$x)
+
+p <- ggplot(wvs_rotated, aes(PC1, PC2, colour = H_URBRURAL, fill = H_URBRURAL)) +
+  geom_point() +
+  labs(x = "PC1 - 47.9%", y = "PC2 - 9.7%") +
+  theme(legend.position = "bottom")
+ggMarginal(p, groupColour = TRUE)
+
+#' Loadings  
+wvs_loadings <- wvs_pca$rotation %>%
+  as_tibble(rownames = "Variable") %>%
+  pivot_longer(-Variable)
+
+#- loadings-plot, fig.height=12
+wvs_loadings %>%
+  filter(name %in% paste0("PC", 1:2)) %>%
+  ggplot(aes(value, Variable)) +
+  geom_bar(stat = "identity") +
+  facet_wrap(~name)
+
+#' ### MANOVA
+wvs_manova <- manova(wvs_response ~ wvs_numeric$H_URBRURAL)
+summary(wvs_manova, test = "Hotelling")
+
+#' Have we met the approximate assumptions for MANOVA?
+
+# Multi-colinearity?
+wvs_numeric_corr <- cor(wvs_response)^2 %>%
+  as_tibble(rownames = "var1") %>%
+  pivot_longer(-var1, "var2")
+
+#- heatmap, fig.height = 12, fig.width = 12
+ggplot(wvs_numeric_corr, aes(var1, var2, fill = value)) +
+  geom_raster() +
+  scale_fill_viridis_c() +
+  theme_rotate_x +
+  labs(x = "", y = "") +
+  coord_equal()
+
 #' ## Can we predict urban-rural status?
 #' ### Univariate logistic regression model
 
 #' Fit a univariate logistic regression for every predictor.
-#- models, cache = TRUE
+#- models-rural-response, cache = TRUE
 predictors <- names(wvs)[-1]
-formulae <- map(predictors, reformulate, response = "H_URBRURAL") %>%
+predictor_formulae <- map(predictors, reformulate, response = "H_URBRURAL") %>%
   set_names(predictors)
-rur_models <- map(formulae, glm, family = binomial(), data = wvs) 
+rur_models <- map(predictor_formulae, glm, family = binomial(), data = wvs) 
 
 #' Compute a likelihood ratio test statistic, p value and adjusted p value for
 #' each model.
@@ -48,6 +123,7 @@ rur_model_summaries %>%
 #' The most predictive variables are:
 #' 
 #' * Q281: To which of the following occupational groups do you belong?
+#'     * Farmer and farm owner are significant levels.
 #' * Q282: To which of the following occupational groups does your spouse belong?
 #' * Q273: Marital/relationship status.
 #' * Q140: Which of the following things have you done for reasons of security:
@@ -60,54 +136,44 @@ c("Q140", "Q273", "Q281", "Q282") %>%
   map(~tidy(rur_models[[.x]], exponentiate = TRUE)) %>%
   map(knitr::kable)
 
-
-#' ## Random forest
-
-#' Are there non-linearities in the predictors? We might find different
-#' predictor importances with a non-linear regression method.
+#' ## What does rural-urban status best predict?
 #' 
-#' We're going to want all of our cores for this: start a cluster.
-cl <- makePSOCKcluster(detectCores() - 1)
-registerDoParallel(cl)
+#' Which variables are most affected by rural or urban status?
 
-rf_control <- trainControl(verboseIter = TRUE,
-                           allowParallel = TRUE)
+# Which modelling function do we need? Depends on the type of response variable.
+find_model <- function(x) {
+  UseMethod("find_model")
+}
 
-#' Fit a random forest.
-#- rf-fit, cache = TRUE
-rf_model <- train(H_URBRURAL ~ .,
-                  data = wvs,
-                  method = "ranger",
-                  na.action = "na.omit",
-                  trControl = rf_control,
-                  tuneLength = 10,
-                  importance = "impurity",
-                  num.trees = 10000)
+find_model.ordered <- function(x) {
+  # Cumulative logit model for ordinal regression.
+  safely(ordinal::clm)
+}
 
-stopCluster(cl)
+find_model.factor <- function(x) {
+  n <- nlevels(x)
+  # Logistic regression for binary responses.
+  if (n == 2) safely(partial(stats::glm, family = "binomial"))
+  # Multinomial logit for other factors.
+  else safely(mlogit::mlogit)
+}
 
-rf_model$finalModel
+find_model.double <- function(x) {
+  # Linear model for continuous responses
+  safely(lm)
+}
 
-rf_importance <- varImp(rf_model)
+# Define and fit the models:
+#- models-rural-predicts, cache = TRUE
+response_models <- tibble(
+  response = names(wvs)[-1],
+  response_formula = map(response, ~reformulate("H_URBRURAL", .x)),
+  response_type = map(response, ~class(wvs[[.x]])),
+  model_fun = map(response, ~find_model(wvs[[.x]])),
+  fitted_model = map2(model_fun, response_formula, 
+                      ~exec(.x, .y, data = wvs))
+)
 
-#' Which variables contribute the most to the random forest?
-plot(rf_importance, top = 20)
+response_summaries <- map(response_models$fitted_model, 
+                          ~glance(.x$result))
 
-#' These estimates seem to be extremely unstable: re-training the random forest
-#' yields a new set of important predictors each time. However, with repeated
-#' runs, a few predictors repeatedly float to the top: Q162, Q126 ("Hard to
-#' say"), Q213, ("Would never do"), Q217 ("Would never do"), Q218 ("Would never
-#' do"), Q286 ("Spent some savings and borrowed money"), Q173 ("An atheist".)
-#' 
-#' These are:
-#' 
-#' * Q126: Immigration increases the risks of terrorism ("Hard to say").
-#' * Q162: It is not important for me to know about science in my daily life.
-#' * Q173: Independently of whether you attend religious services or not, would
-#' you say you are…? ("An atheist")
-#' * Q213: Political actions: donating to a group or campaign ("Would never do")
-#' * Q217: Political actions using the internet: Searching information about
-#' politics and political events ("Would never do")
-#' * Q218: Political actions using the internet: Signing an electronic petition
-#' ("Would never do")
-#' * Q286:  During the past year, did your family ("Spent some savings and borrowed money")

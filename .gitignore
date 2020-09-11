@@ -2,6 +2,7 @@
 .Rhistory
 .RData
 .Ruserdata
+cache/
 
 # Ignore most rendered previews and intermediate output:
 *.pdf

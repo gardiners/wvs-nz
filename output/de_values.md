@@ -8,11 +8,17 @@ output: github_document
 
 
 ```r
-library(tidyverse)
+library(mlogit)
 library(here)
 library(broom)
-library(caret)
-library(doParallel)
+library(ordinal)
+library(tidyverse)
+library(ggExtra)
+
+theme_set(theme_minimal())
+theme_rotate_x <- theme(axis.text.x = element_text(angle = -90,
+                                                   hjust = 0,
+                                                   vjust = 0.5))
 
 wvs <- readRDS(here("data", "nzl_coded.RDS")) %>%
   select(H_URBRURAL, matches("Q[0-9]+")) %>%
@@ -21,6 +27,123 @@ wvs <- readRDS(here("data", "nzl_coded.RDS")) %>%
                              labels = c("Urban", "Rural")))
 ```
 
+## Are urban and rural respondents different?
+
+On continuous responses, considered jointly.
+
+
+```r
+wvs_numeric <- wvs %>%
+  select(where(is.numeric), H_URBRURAL, -Q288R, -Q289CS, -Q261) %>%
+  na.omit()
+
+wvs_response <- wvs_numeric %>%
+  select(-H_URBRURAL) %>%
+  as.matrix()
+```
+
+### PCA
+
+
+```r
+wvs_pca <- prcomp(wvs_response, center = TRUE, scale = FALSE)
+summary(wvs_pca)$importance[,1:5]
+```
+
+```
+##                             PC1      PC2      PC3      PC4      PC5
+## Standard deviation     15.17852 6.854928 4.809897 4.059524 3.254256
+## Proportion of Variance  0.47901 0.097700 0.048100 0.034260 0.022020
+## Cumulative Proportion   0.47901 0.576710 0.624810 0.659080 0.681100
+```
+
+Scree plot:
+
+
+```r
+wvs_pca_long <- t(summary(wvs_pca)$importance) %>%
+  as_tibble(rownames = "Component") %>%
+  mutate(Eigenvalue = `Standard deviation`^2)
+
+ggplot(wvs_pca_long, aes(reorder(Component, -Eigenvalue), Eigenvalue)) +
+  geom_point() +
+  geom_hline(yintercept = mean(wvs_pca_long$Eigenvalue), linetype = "dashed") +
+  theme_rotate_x +
+  labs(x = "Component")
+```
+
+![plot of chunk unnamed-chunk-3](de_values/unnamed-chunk-3-1.png)
+
+Reprojected observations:
+
+
+```r
+wvs_rotated <- data.frame(H_URBRURAL = wvs_numeric$H_URBRURAL,
+                          wvs_pca$x)
+
+p <- ggplot(wvs_rotated, aes(PC1, PC2, colour = H_URBRURAL, fill = H_URBRURAL)) +
+  geom_point() +
+  labs(x = "PC1 - 47.9%", y = "PC2 - 9.7%") +
+  theme(legend.position = "bottom")
+ggMarginal(p, groupColour = TRUE)
+```
+
+![plot of chunk reprojection](de_values/reprojection-1.png)
+
+Loadings  
+
+
+```r
+wvs_loadings <- wvs_pca$rotation %>%
+  as_tibble(rownames = "Variable") %>%
+  pivot_longer(-Variable)
+```
+
+```r
+wvs_loadings %>%
+  filter(name %in% paste0("PC", 1:2)) %>%
+  ggplot(aes(value, Variable)) +
+  geom_bar(stat = "identity") +
+  facet_wrap(~name)
+```
+
+![plot of chunk loadings-plot](de_values/loadings-plot-1.png)
+
+### MANOVA
+
+
+```r
+wvs_manova <- manova(wvs_response ~ wvs_numeric$H_URBRURAL)
+summary(wvs_manova, test = "Hotelling")
+```
+
+```
+##                         Df Hotelling-Lawley approx F num Df den Df Pr(>F)
+## wvs_numeric$H_URBRURAL   1          0.17145   1.2002     53    371 0.1713
+## Residuals              423
+```
+
+Have we met the approximate assumptions for MANOVA?
+
+
+```r
+# Multi-colinearity?
+wvs_numeric_corr <- cor(wvs_response)^2 %>%
+  as_tibble(rownames = "var1") %>%
+  pivot_longer(-var1, "var2")
+```
+
+```r
+ggplot(wvs_numeric_corr, aes(var1, var2, fill = value)) +
+  geom_raster() +
+  scale_fill_viridis_c() +
+  theme_rotate_x +
+  labs(x = "", y = "") +
+  coord_equal()
+```
+
+![plot of chunk heatmap](de_values/heatmap-1.png)
+
 ## Can we predict urban-rural status?
 ### Univariate logistic regression model
 Fit a univariate logistic regression for every predictor.
@@ -28,9 +151,9 @@ Fit a univariate logistic regression for every predictor.
 
 ```r
 predictors <- names(wvs)[-1]
-formulae <- map(predictors, reformulate, response = "H_URBRURAL") %>%
+predictor_formulae <- map(predictors, reformulate, response = "H_URBRURAL") %>%
   set_names(predictors)
-rur_models <- map(formulae, glm, family = binomial(), data = wvs) 
+rur_models <- map(predictor_formulae, glm, family = binomial(), data = wvs) 
 ```
 
 Compute a likelihood ratio test statistic, p value and adjusted p value for
@@ -55,11 +178,12 @@ rur_model_summaries %>%
   geom_point()
 ```
 
-![plot of chunk unnamed-chunk-2](de_values/unnamed-chunk-2-1.png)
+![plot of chunk unnamed-chunk-8](de_values/unnamed-chunk-8-1.png)
 
 The most predictive variables are:
 
 * Q281: To which of the following occupational groups do you belong?
+    * Farmer and farm owner are significant levels.
 * Q282: To which of the following occupational groups does your spouse belong?
 * Q273: Marital/relationship status.
 * Q140: Which of the following things have you done for reasons of security:
@@ -131,97 +255,181 @@ c("Q140", "Q273", "Q281", "Q282") %>%
 ## |Q282Farm owner, farm manager                                     | 5.397950e+06|  594.1637|  0.0260897| 0.9791858|
 ```
 
-## Random forest
-Are there non-linearities in the predictors? We might find different
-predictor importances with a non-linear regression method.
+## What does rural-urban status best predict?
 
-We're going to want all of our cores for this: start a cluster.
+Which variables are most affected by rural or urban status?
 
 
 ```r
-cl <- makePSOCKcluster(detectCores() - 1)
-registerDoParallel(cl)
+# Which modelling function do we need? Depends on the type of response variable.
+find_model <- function(x) {
+  UseMethod("find_model")
+}
 
-rf_control <- trainControl(verboseIter = TRUE,
-                           allowParallel = TRUE)
-```
+find_model.ordered <- function(x) {
+  # Cumulative logit model for ordinal regression.
+  safely(ordinal::clm)
+}
 
-Fit a random forest.
+find_model.factor <- function(x) {
+  n <- nlevels(x)
+  # Logistic regression for binary responses.
+  if (n == 2) safely(partial(stats::glm, family = "binomial"))
+  # Multinomial logit for other factors.
+  else safely(mlogit::mlogit)
+}
 
+find_model.double <- function(x) {
+  # Linear model for continuous responses
+  safely(lm)
+}
 
-```r
-rf_model <- train(H_URBRURAL ~ .,
-                  data = wvs,
-                  method = "ranger",
-                  na.action = "na.omit",
-                  trControl = rf_control,
-                  tuneLength = 10,
-                  importance = "impurity",
-                  num.trees = 10000)
-```
-
-```
-## Warning in nominalTrainWorkflow(x = x, y = y, wts = weights, info = trainInfo, : There were missing
-## values in resampled performance measures.
-```
-
-```
-## Aggregating results
-## Selecting tuning parameters
-## Fitting mtry = 2, splitrule = gini, min.node.size = 1 on full training set
+# Define and fit the models:
 ```
 
 ```r
-stopCluster(cl)
-
-rf_model$finalModel
+response_models <- tibble(
+  response = names(wvs)[-1],
+  response_formula = map(response, ~reformulate("H_URBRURAL", .x)),
+  response_type = map(response, ~class(wvs[[.x]])),
+  model_fun = map(response, ~find_model(wvs[[.x]])),
+  fitted_model = map2(model_fun, response_formula, 
+                      ~exec(.x, .y, data = wvs))
+)
 ```
 
 ```
-## Ranger result
-## 
-## Call:
-##  ranger::ranger(dependent.variable.name = ".outcome", data = x,      mtry = min(param$mtry, ncol(x)), min.node.size = param$min.node.size,      splitrule = as.character(param$splitrule), write.forest = TRUE,      probability = classProbs, ...) 
-## 
-## Type:                             Classification 
-## Number of trees:                  10000 
-## Sample size:                      10 
-## Number of independent variables:  763 
-## Mtry:                             2 
-## Target node size:                 1 
-## Variable importance mode:         impurity 
-## Splitrule:                        gini 
-## OOB prediction error:             30.00 %
+## Warning in FUN(X[[i]], ...): NAs introduced by coercion
+
+## Warning in FUN(X[[i]], ...): NAs introduced by coercion
+
+## Warning in FUN(X[[i]], ...): NAs introduced by coercion
+
+## Warning in FUN(X[[i]], ...): NAs introduced by coercion
+
+## Warning in FUN(X[[i]], ...): NAs introduced by coercion
+
+## Warning in FUN(X[[i]], ...): NAs introduced by coercion
+
+## Warning in FUN(X[[i]], ...): NAs introduced by coercion
+
+## Warning in FUN(X[[i]], ...): NAs introduced by coercion
+
+## Warning in FUN(X[[i]], ...): NAs introduced by coercion
+
+## Warning in FUN(X[[i]], ...): NAs introduced by coercion
+
+## Warning in FUN(X[[i]], ...): NAs introduced by coercion
+
+## Warning in FUN(X[[i]], ...): NAs introduced by coercion
+
+## Warning in FUN(X[[i]], ...): NAs introduced by coercion
+
+## Warning in FUN(X[[i]], ...): NAs introduced by coercion
+
+## Warning in FUN(X[[i]], ...): NAs introduced by coercion
+
+## Warning in FUN(X[[i]], ...): NAs introduced by coercion
+
+## Warning in FUN(X[[i]], ...): NAs introduced by coercion
+
+## Warning in FUN(X[[i]], ...): NAs introduced by coercion
+
+## Warning in FUN(X[[i]], ...): NAs introduced by coercion
+
+## Warning in FUN(X[[i]], ...): NAs introduced by coercion
+
+## Warning in FUN(X[[i]], ...): NAs introduced by coercion
+
+## Warning in FUN(X[[i]], ...): NAs introduced by coercion
+
+## Warning in FUN(X[[i]], ...): NAs introduced by coercion
+
+## Warning in FUN(X[[i]], ...): NAs introduced by coercion
+
+## Warning in FUN(X[[i]], ...): NAs introduced by coercion
+
+## Warning in FUN(X[[i]], ...): NAs introduced by coercion
+
+## Warning in FUN(X[[i]], ...): NAs introduced by coercion
+
+## Warning in FUN(X[[i]], ...): NAs introduced by coercion
+
+## Warning in FUN(X[[i]], ...): NAs introduced by coercion
+
+## Warning in FUN(X[[i]], ...): NAs introduced by coercion
+
+## Warning in FUN(X[[i]], ...): NAs introduced by coercion
+
+## Warning in FUN(X[[i]], ...): NAs introduced by coercion
+
+## Warning in FUN(X[[i]], ...): NAs introduced by coercion
+
+## Warning in FUN(X[[i]], ...): NAs introduced by coercion
+
+## Warning in FUN(X[[i]], ...): NAs introduced by coercion
+
+## Warning in FUN(X[[i]], ...): NAs introduced by coercion
+
+## Warning in FUN(X[[i]], ...): NAs introduced by coercion
+
+## Warning in FUN(X[[i]], ...): NAs introduced by coercion
+
+## Warning in FUN(X[[i]], ...): NAs introduced by coercion
+
+## Warning in FUN(X[[i]], ...): NAs introduced by coercion
+
+## Warning in FUN(X[[i]], ...): NAs introduced by coercion
+
+## Warning in FUN(X[[i]], ...): NAs introduced by coercion
+
+## Warning in FUN(X[[i]], ...): NAs introduced by coercion
+
+## Warning in FUN(X[[i]], ...): NAs introduced by coercion
+
+## Warning in FUN(X[[i]], ...): NAs introduced by coercion
+
+## Warning in FUN(X[[i]], ...): NAs introduced by coercion
+
+## Warning in FUN(X[[i]], ...): NAs introduced by coercion
+
+## Warning in FUN(X[[i]], ...): NAs introduced by coercion
+
+## Warning in FUN(X[[i]], ...): NAs introduced by coercion
+
+## Warning in FUN(X[[i]], ...): NAs introduced by coercion
+
+## Warning in FUN(X[[i]], ...): NAs introduced by coercion
+
+## Warning in FUN(X[[i]], ...): NAs introduced by coercion
+
+## Warning in FUN(X[[i]], ...): NAs introduced by coercion
+
+## Warning in FUN(X[[i]], ...): NAs introduced by coercion
+
+## Warning in FUN(X[[i]], ...): NAs introduced by coercion
+
+## Warning in FUN(X[[i]], ...): NAs introduced by coercion
+
+## Warning in FUN(X[[i]], ...): NAs introduced by coercion
+
+## Warning in FUN(X[[i]], ...): NAs introduced by coercion
+
+## Warning in FUN(X[[i]], ...): NAs introduced by coercion
+
+## Warning in FUN(X[[i]], ...): NAs introduced by coercion
+
+## Warning in FUN(X[[i]], ...): NAs introduced by coercion
+
+## Warning in FUN(X[[i]], ...): NAs introduced by coercion
+
+## Warning in FUN(X[[i]], ...): NAs introduced by coercion
+
+## Warning in FUN(X[[i]], ...): NAs introduced by coercion
 ```
 
 ```r
-rf_importance <- varImp(rf_model)
+response_summaries <- map(response_models$fitted_model, 
+                          ~glance(.x$result))
 ```
 
-Which variables contribute the most to the random forest?
-
-
-```r
-plot(rf_importance, top = 20)
-```
-
-![plot of chunk unnamed-chunk-5](de_values/unnamed-chunk-5-1.png)
-
-These estimates seem to be extremely unstable: re-training the random forest
-yields a new set of important predictors each time. However, with repeated
-runs, a few predictors repeatedly float to the top: Q162, Q126 ("Hard to
-say"), Q213, ("Would never do"), Q217 ("Would never do"), Q218 ("Would never
-do"), Q286 ("Spent some savings and borrowed money"), Q173 ("An atheist".)
-
-These are:
-
-* Q126: Immigration increases the risks of terrorism ("Hard to say").
-* Q162: It is not important for me to know about science in my daily life.
-* Q173: Independently of whether you attend religious services or not, would
-you say you are…? ("An atheist")
-* Q213: Political actions: donating to a group or campaign ("Would never do")
-* Q217: Political actions using the internet: Searching information about
-politics and political events ("Would never do")
-* Q218: Political actions using the internet: Signing an electronic petition
-("Would never do")
-* Q286:  During the past year, did your family ("Spent some savings and borrowed money")
