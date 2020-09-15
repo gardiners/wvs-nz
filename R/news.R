@@ -14,6 +14,7 @@ library(tidyverse)
 library(naniar)
 library(ggfortify)
 library(broom)
+library(psych)
 
 theme_set(theme_minimal())
 theme_rotate_x <- theme(axis.text.x = element_text(angle = -90,
@@ -27,8 +28,11 @@ wvs <- readRDS(here("data", "nzl_coded.RDS"))
 #' News sources are Q201:208. Outgroups and people with "undesirable" traits are
 #' listed at Q18:26. `D_INTERVIEW` is a subject UID.
 
+#' Extract the news variables and reorder so that frequency increases with
+#' factor level.
 news <- wvs %>%
-  select(D_INTERVIEW, starts_with(paste0("Q", 201:208)))
+  select(D_INTERVIEW, starts_with(paste0("Q", 201:208))) %>%
+  mutate(across(where(is.ordered), fct_rev))
 
 summary(news)
 
@@ -51,42 +55,33 @@ ggplot(news_long, aes(value)) +
 levels(news_long$value)
 
 
-#' We could take the reciprocal of the period as a frequency. This new variable
-#' is days per year per news source.
+#' Our news-consumption variables are all ordinal. We therefore compute a
+#' polychoric correlation matrix.
 
-news_freq <- news %>%
-  mutate(across(where(is.ordered),
-                 ~case_when(.x == "Daily" ~ 365,
-                            .x == "Weekly" ~ 52,
-                            .x == "Monthly" ~ 12,
-                            .x == "Less than monthly" ~ 0,
-                            .x == "Never" ~ 0))) %>%
-  rename(Newspaper = Q201,
-         TV = Q202,
-         Radio = Q203,
-         "Mobile phone" = Q204,
-         Email = Q205,
-         Internet = Q206,
-         "Social media" = Q207,
-         "Conversation" = Q208)
-
-news_freq_matrix <- news_freq %>%
+#- polychor-ml, cache = TRUE
+news_cor <- news %>%
   select(-D_INTERVIEW) %>%
-  na.omit() %>%
-  as.matrix()
+  mutate(across(everything(), as.integer)) %>%
+  polychoric()
 
 #' ## PCA worth trying?
 
-news_pc <- prcomp(news_freq_matrix, center = TRUE, scale = TRUE)
-news_eigen <- tidy(news_pc, "eigenvalues")
-news_loadings <- tidy(news_pc, "loadings")
+news_pc8 <- principal(r = news_cor$rho, nfactors = 8, rotate = "none")
+news_eigen <- tibble(
+  PC = 1:length(news_decomp$values),
+  Eigenvalue = news_decomp$value,
+  std.dev = sqrt(Eigenvalue)
+)
+news_loadings <- tidy(news_pc8, "loadings")
 news_scores <- tidy(news_pc, "scores")
 
 #' Variance explained:
-summary(news_pc)
+news_eigen %>%
+  mutate("Variance Explained" = Eigenvalue / sum(Eigenvalue),
+         "Cumulative" = cumsum(Eigenvalue) / sum(Eigenvalue))
 
 #' Visually:
-ggplot(news_eigen, aes(PC, std.dev^2)) +
+ggplot(news_eigen, aes(PC, Eigenvalue)) +
   geom_point() +
   geom_line() +
   geom_hline(yintercept = 1, colour = "firebrick", linetype = "dashed") +
