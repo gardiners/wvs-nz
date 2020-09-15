@@ -70,4 +70,4 @@ nzl_clean <- nzl_coded %>%
 
 
 #' # Serialise for other scripts
-saveRDS(nzl_coded, here("data", "nzl_coded.RDS"))
+saveRDS(nzl_clean, here("data", "nzl_coded.RDS"))
