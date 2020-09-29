@@ -51,7 +51,7 @@ wvs_sqr %>%
   pivot_longer(-from, names_to = "to") %>%
   ggplot(aes(from, to, fill = value)) +
   geom_raster() +
-  scale_fill_viridis()) +
+  scale_fill_viridis() +
   coord_fixed()
   
 
@@ -59,77 +59,80 @@ wvs_sqr %>%
 
 #' Find an appropriate soft threshold to consider variables joined by an edge:
 
-#' sft <- pickSoftThreshold.fromSimilarity(wvs_abs, moreNetworkConcepts = TRUE)
-#' 
-#' sft$fitIndices
-#' sft$powerEstimate
-#' 
-#' # TODO: plot fit indices
-#' 
-#' #' Find the adjacency matrix.
-#' wvs_adj <- adjacency.fromSimilarity(wvs_abs,
-#'                                     power = 3) %>%
-#'   `class<-`("matrix") %>%
-#'   `diag<-`(0)
-#' 
-#' #' Find a topological overlap matrix.
-#' wvs_tom <- TOMsimilarity(wvs_adj)
-#' wvs_tom_dis <- 1 - wvs_tom
-#' 
-#' #' Cluster questions using topological overlap
-#' wvs_tree <- fastcluster::hclust(as.dist(wvs_tom_dis), method = "average")
-#' 
-#' plot(wvs_tree)
-#' 
-#' #' Find question modules.
-#' q_mods <- cutreeDynamic(wvs_tree, distM = wvs_tom_dis, deepSplit = 4)
-#' table(q_mods)
-#' 
-#' # Build the network and assign survey questions to their modules.
-#' wvs_net <- as_tbl_graph(wvs_adj, directed = FALSE) %>%
-#'   activate(nodes) %>%
-#'   mutate(module = q_mods)
-#' 
-#' # Look at degree distributions:
-#' wvs_deg_dists <- map_dfr(set_names(seq(0.025, 0.975, by = 0.025)) ,
-#'                          function(fraction) {
-#'                            wvs_net %>%
-#'                              activate(edges) %>%
-#'                              top_frac(fraction, weight) %>%
-#'                              activate(nodes) %>%
-#'                              mutate(degree = centrality_degree()) %>%
-#'                              as_tibble()
-#'                          },
-#'                          .id = "fraction")
-#' 
-#' ggplot(wvs_deg_dists, aes(degree, colour = fraction)) +
-#'   geom_density() +
-#'   scale_colour_viridis_d()
-#' 
-#' #'  Visualise top 0.05 strongest associations.
-#' wvs_net_reduced <- wvs_net %>%
-#'   activate(nodes) %>%
-#'   filter(module > 0) %>%
-#'   activate(edges) %>%
-#'   top_frac(0.05, weight) %>%
-#'   activate(nodes) %>%
-#'   filter(centrality_degree() > 0)
-#' 
-#' ggraph(wvs_net_reduced) +
-#'   geom_edge_link(aes(width = weight, alpha = weight)) +
-#'   geom_node_label(aes(label = name,
-#'                       fill = factor(module)),
-#'                   alpha = 3/4,
-#'                   size = 2) +
-#'   theme(legend.position = "none")
+sft <- pickSoftThreshold.fromSimilarity(wvs_abs, moreNetworkConcepts = TRUE)
+
+sft$fitIndices
+sft$powerEstimate
+
+# TODO: plot fit indices
+
+#' Find the adjacency matrix.
+wvs_adj <- adjacency.fromSimilarity(wvs_abs,
+                                    power = sft$powerEstimate) %>%
+  `class<-`("matrix") %>%
+  `diag<-`(0)
+
+#' Find a topological overlap matrix.
+wvs_tom <- TOMsimilarity(wvs_adj)
+wvs_tom_dis <- 1 - wvs_tom
+
+#' Cluster questions using topological overlap
+wvs_tree <- fastcluster::hclust(as.dist(wvs_tom_dis), method = "average")
+
+plot(wvs_tree)
+
+#' Find question modules.
+q_mods <- cutreeDynamic(wvs_tree, distM = wvs_tom_dis, deepSplit = 4)
+table(q_mods)
+
+# Build the network and assign survey questions to their modules.
+wvs_net <- as_tbl_graph(wvs_adj, directed = FALSE) %>%
+  activate(nodes) %>%
+  mutate(module = factor(q_mods, levels = 1:5))
+
+# Look at degree distributions:
+wvs_deg_dists <- map_dfr(set_names(seq(0.025, 0.975, by = 0.025)) ,
+                         function(fraction) {
+                           wvs_net %>%
+                             activate(edges) %>%
+                             top_frac(fraction, weight) %>%
+                             activate(nodes) %>%
+                             mutate(degree = centrality_degree()) %>%
+                             as_tibble()
+                         },
+                         .id = "fraction")
+
+ggplot(wvs_deg_dists, aes(degree, colour = fraction)) +
+  geom_density() +
+  scale_colour_viridis_d()
+
+#'  Visualise top 0.05 strongest associations.
+wvs_net_reduced <- wvs_net %>%
+  activate(nodes) %>%
+  #filter(module != 0) %>%
+  activate(edges) %>%
+  top_frac(0.05, weight) %>%
+  activate(nodes) %>%
+  filter(centrality_degree() > 0,
+         !node_is_isolated())
+
+ggraph(wvs_net_reduced, layout = "fr") +
+  geom_edge_bend(aes(width = weight, alpha = weight)) +
+  geom_node_label(aes(label = name,
+                      fill = module),
+                  alpha = 3/4,
+                  size = 2) +
+  theme(legend.position = "none")
 
 
-#' Which nodes are the most important connectors?
-# wvs_net_reduced %>%
-#   activate(edge) %>%
-#   filter(edge_is_between())
+neighbours <- wvs_net_reduced %>%
+  activate(nodes) %>%
+  mutate(neighbourhood = local_members())
+  
+neighbours$nodes$neighbourhood
 
-#' # Hard thresholding
+
+#' # Hard thresholding experiment
 
 hard <- pickHardThreshold.fromSimilarity(wvs_abs)
 hard$cutEstimate
