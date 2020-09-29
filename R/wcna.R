@@ -114,7 +114,9 @@ wvs_net_reduced <- wvs_net %>%
   top_frac(0.05, weight) %>%
   activate(nodes) %>%
   filter(centrality_degree() > 0,
-         !node_is_isolated())
+         !node_is_isolated()) %>%
+  mutate(neighbours1 = local_members(order = 1),
+         neighbours2 = local_members(order = 2))
 
 ggraph(wvs_net_reduced, layout = "fr") +
   geom_edge_bend(aes(width = weight, alpha = weight)) +
@@ -124,12 +126,76 @@ ggraph(wvs_net_reduced, layout = "fr") +
                   size = 2) +
   theme(legend.position = "none")
 
+#' ### Examine neighbourhoods of interest
 
-neighbours <- wvs_net_reduced %>%
+#' Urban vs rural
+#' --------------
+
+urbrural_tree <- wvs_net_reduced %>%
+  convert(to_local_neighborhood,
+          node = which(.N()$name == "H_URBRURAL"),
+          order = 2)
+
+urbrural_tree %>%
+  ggraph(layout = "kk") +
+  geom_edge_link() +
+  geom_node_label(aes(label = name))
+
+#' The only real association seems to be with Q189.
+
+ggplot(wvs_q, aes(H_URBRURAL, Q189)) +
+  geom_violin()
+
+wvs_q %>%
+  group_by(H_URBRURAL) %>%
+  summarise(Q189_mean = mean(Q189, na.rm = TRUE))
+
+#' It seems there are a couple of outliers in the urban group who think it is
+#' "Always justifiable for a man to beat his wife".
+
+#' Sources of news
+#' ---------------
+
+news_q <- paste0("Q", 201:208)
+
+news_neighbours <- wvs_net_reduced %>%
   activate(nodes) %>%
-  mutate(neighbourhood = local_members())
+  filter(name %in% news_q) %>%
+  as_tibble() %>%
+  pull(neighbours1) %>%
+  unlist() %>%
+  append(201:208) %>%
+  unique()
+
+# news_neighbourhood <- wvs_net_reduced %>%
+#    activate(nodes) %>%
+#    filter(node_distance_from(nodes = which(.N()$name %in% news_q),
+#                              mode = "all") <= 2)
+
+news_neighbourhood <- wvs_net_reduced %>%
+  activate(nodes) %>%
+  filter(1:nrow(.N()) %in% news_neighbours) %>%
+  mutate(highlight = name %in% news_q)
+
+ggraph(news_neighbourhood) +
+  geom_edge_bend(aes(alpha = weight, width = weight)) +
+  geom_node_label(aes(label = name, fill = highlight))
+
+news_neighbourhood %>%
+  activate(nodes) %>%
+  as_tibble
+
+# news_tree <- map(news_q,
+#                  function(question){
+#                    subgraph <- wvs_net_reduced %>%
+#                      convert(to_local_neighborhood,
+#                              node = which(.N()$name == question),
+#                              order = 2)
+#                    subgraph
+# })
   
-neighbours$nodes$neighbourhood
+
+
 
 
 #' # Hard thresholding experiment
