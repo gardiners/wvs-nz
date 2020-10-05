@@ -62,6 +62,30 @@ ggplot(news_long, aes(value)) +
 
 levels(news_long$value)
 
+#' ## Correlation with other variables
+
+#' The exploratory [network analysis](wcna.md) find the following variables are
+#' reasonably associated with the news-consumption questions:
+#'
+#' * Q45 -"Please tell me for each one, if it were to happen, whether you think it would be a good thing, a bad thing, or don't you mind: **Greater respect for authority**."
+#' * Q67 - "I am going to name a number of organizations. For each one, could you tell me how much confidence you have in them: is it a great deal of confidence, quite a lot of confidence, not very much confidence or none at all: **Television**."
+#' * "Please tell me for each of the following actions whether you think it can always be justified, never be justified, or something in between:" 
+#'   * Q182 - **Homosexuality**
+#'   * Q193 - **Casual Sex**
+#' * "What about these forms of political action and social activism that people can take? Please, tell me for each of them if you have done any of these things, whether you might do it or would never under any circumstances do it:"
+#'   * Q213 - **Donating to a group or campaign**
+#'   * Q214 - **Contacting a government official**
+#'   * Q215 - **Encouraging others to take action about political issues**
+#'   * Q216 - **Encouraging others to vote**
+#' * "Now I’d like you to look at this card. I’m going to read out some other forms of political action that people can take using Internet and social media tools like Facebook, Twitter etc., and I’d like you to tell me, for each one, whether you have done any of these things, whether you might do it or would never under any circumstances do it"
+#'   * Q217 - **Searching information about politics and political events **
+#'   * Q218 - **Signing an electronic petition**
+#'   * Q219 - **Encouraging other people to take any form of political action**
+#'   * Q220 - **Organizing political activities, events, protests**
+#' * Demographic traits:
+#'   * Q262 - **Age**
+#'   * Q270 - **Household size**
+#'   * Q288 - **Self-rated household income decile**
 
 #' ## PCA on news source consumption
 
