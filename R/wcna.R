@@ -185,16 +185,28 @@ news_neighbourhood %>%
   activate(nodes) %>%
   as_tibble
 
-# news_tree <- map(news_q,
-#                  function(question){
-#                    subgraph <- wvs_net_reduced %>%
-#                      convert(to_local_neighborhood,
-#                              node = which(.N()$name == question),
-#                              order = 2)
-#                    subgraph
-# })
-  
+#' Unwanted neighbours
 
+out_q <- paste0("Q", 18:26)
+
+out_neighbours <- wvs_net_reduced %>%
+  activate(nodes) %>%
+  filter(name %in% out_q) %>%
+  as_tibble() %>%
+  pull(neighbours1) %>%
+  unlist() %>%
+  unique()
+
+out_neighbourhood <- wvs_net_reduced %>%
+  activate(nodes) %>%
+  filter(1:nrow(.N()) %in% out_neighbours) %>%
+  mutate(highlight = name %in% out_q)
+
+saveRDS(out_neighbourhood, file = here("data", "out_neighbourhood.RDS"))
+
+ggraph(out_neighbourhood, layout = "fr") +
+  geom_edge_link0(aes(alpha = weight, width = weight)) +
+  geom_node_label(aes(label = name, fill = highlight))
 
 
 
