@@ -200,20 +200,20 @@ news_neighbourhood %>%
 
 #' # Hard thresholding experiment
 
-hard <- pickHardThreshold.fromSimilarity(wvs_abs)
-hard$cutEstimate
-
-hard_adj <- signumAdjacencyFunction(wvs_abs, hard$cutEstimate)
-
-hard_net <- as_tbl_graph(hard_adj, directed = FALSE) 
-  
-hard_net %>%
-  activate(nodes) %>%
-  filter(centrality_degree(mode = "all", loops = FALSE) >= 1,
-         !node_is_isolated()) %>%
-  ggraph(layout = "dh") +
-  geom_edge_link() +
-  geom_node_label(aes(label = name), size = 2.25) +
-  theme_graph() +
-  theme(legend.position = "bottom")
+# hard <- pickHardThreshold.fromSimilarity(wvs_abs)
+# hard$cutEstimate
+# 
+# hard_adj <- signumAdjacencyFunction(wvs_abs, hard$cutEstimate)
+# 
+# hard_net <- as_tbl_graph(hard_adj, directed = FALSE) 
+#   
+# hard_net %>%
+#   activate(nodes) %>%
+#   filter(centrality_degree(mode = "all", loops = FALSE) >= 1,
+#          !node_is_isolated()) %>%
+#   ggraph(layout = "dh") +
+#   geom_edge_link() +
+#   geom_node_label(aes(label = name), size = 2.25) +
+#   theme_graph() +
+#   theme(legend.position = "bottom")
 
