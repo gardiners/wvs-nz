@@ -109,6 +109,8 @@ news_eigen <- tibble(
 news_scores <- as.data.frame(news_pc$scores) %>%
   cbind(D_INTERVIEW = news$D_INTERVIEW, .)
 
+saveRDS(news_scores, here("data", "news_scores.RDS"))
+
 str(news_scores)
 
 news_loadings <- as_tibble(news_pc$weights, rownames = "Variable" )
