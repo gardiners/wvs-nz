@@ -12,6 +12,7 @@ library(partykit)
 library(ggparty)
 library(tidygraph)
 library(ggraph)
+library(VGAM)
 
 theme_set(theme_bw())
 
@@ -72,7 +73,7 @@ training <- sample(c(TRUE, FALSE),
 #' # Build trees
 
 # Inference tree control
-ctrl <- ctree_control(alpha = 0.01,
+ctrl <- ctree_control(alpha = 0.05,
                       MIA = FALSE,
                       minbucket = 10)
 
@@ -125,7 +126,86 @@ plot(trees$Q179)
 
 # What predicts political interest?
 
-# What predicts revolutionaries?
+# ==============================================================================
+# What predicts left-right political identity?
+
+plot(trees$Q240)
+
+ggplot(wvs_q, aes(Q240)) +
+  geom_histogram(bins = 10)
+
+ggplot(wvs_q, aes(Q240, Q262)) +
+  geom_jitter() +
+  geom_smooth()
+
+# Repeat the model without the choice of party vote.
+lr_tree <- prep(wvs_q, "Q240", training) %>%
+  select(-Q223) %>%
+   ctree(Q240 ~ ., data = ., control = ctrl)
+
+plot(lr_tree)
+
+predict(lr_tree, newdata = prep(wvs_q, "Q240", !training))
+
+Q240_train <- prep(wvs_q, "Q240", training)
+Q240_test <- prep(wvs_q, "Q240", !training)
+
+
+Q240_train_pred <- tibble(
+  observed = Q240_train$Q240,
+  predicted = predict(lr_tree, newdata = Q240_train),
+  sqerr = (observed - predicted)^2
+)
+
+sqrt(mean(Q240_train_pred$sqerr))
+
+Q240_pred <- tibble(
+  observed = Q240_test$Q240,
+  predicted = predict(lr_tree, newdata = Q240_test),
+  sqerr = (observed - predicted)^2
+)
+
+sqrt(mean(Q240_pred$sqerr))
+
+# Does a linear regression do as well with the same variables?
+
+
+Q240_lm <- lm(Q240 ~ Q106 + Q42 + Q193 + Q108 + Q214 + Q252 + Q31,
+                 data = Q240_train)
+
+summary(Q240_lm)
+
+Q240_lm_pred <- tibble(
+  observed = Q240_test$Q240,
+  predicted = predict(Q240_lm, newdata = Q240_test),
+  sqerr = (observed - predicted)^2
+)
+sqrt(mean(Q240_lm_pred$sqerr, na.rm = TRUE))
+
+autoplot(Q240_lm)
+
+# What about including age in the lm?
+
+# Which values does left-right political identity affect?
+varimp(lr_tree, nperm = 100)
+trees_table %>%
+  filter(splitvar == "Q240")
+
+#' LR identity predicts Q36: Homosexual couples are as good parents as other couples (a subset of right-leaning do not think homosexuals are good parents)
+plot(trees$Q36)
+
+#' predicts Q68: Confidence in labour unions (left leaning have more confidence in labour unions) - more important is willingness to strike.
+plot(trees$Q68)
+
+#' predicts Q77: Confidence in major companies (slightly more confidence in companies)
+plot(trees$Q77)
+
+#' predicts Q83: Confidence in the UN
+
+# ==============================================================================
+
+
+#' Not many revolutionaries in our dataset!
 
 #' ggparty plot
 #' 
@@ -139,27 +219,27 @@ plot(trees$Q179)
 
 # Produce a variable importance network.
 
-trees_varimp <- map(trees, varimp, nperm = 1)
-
-trees_nodes <- tibble(name = names(trees)) %>%
-  mutate(id = row_number())
-
-trees_nodes[trees_nodes$name %in% c("Q1", "Q2"), "id"]
-
-trees_edges <- imap(trees_varimp,
-                    safely(function(predictors, response, lookup) {
-                      from <- lookup[lookup$name %in% names(predictors), "id"]
-                      to <- lookup[lookup$name == response, "id"]
-                      tibble(from = from$id, to = to$id, weight = predictors)
-                    }),
-                    lookup = trees_nodes) %>%
-  map_dfr("result")
-
-
-trees_graph <- tbl_graph(nodes = trees_nodes,
-                         edges = trees_edges)
-
-ggraph(trees_graph,) +
-  geom_edge_link(arrow = arrow(), aes(edge_width = weight, alpha = weight)) +
-  geom_node_label(aes(label = name))
+# trees_varimp <- map(trees, varimp, nperm = 1)
+# 
+# trees_nodes <- tibble(name = names(trees)) %>%
+#   mutate(id = row_number())
+# 
+# trees_nodes[trees_nodes$name %in% c("Q1", "Q2"), "id"]
+# 
+# trees_edges <- imap(trees_varimp,
+#                     safely(function(predictors, response, lookup) {
+#                       from <- lookup[lookup$name %in% names(predictors), "id"]
+#                       to <- lookup[lookup$name == response, "id"]
+#                       tibble(from = from$id, to = to$id, weight = predictors)
+#                     }),
+#                     lookup = trees_nodes) %>%
+#   map_dfr("result")
+# 
+# 
+# trees_graph <- tbl_graph(nodes = trees_nodes,
+#                          edges = trees_edges)
+# 
+# ggraph(trees_graph,) +
+#   geom_edge_link(arrow = arrow(), aes(edge_width = weight, alpha = weight)) +
+#   geom_node_label(aes(label = name))
 
