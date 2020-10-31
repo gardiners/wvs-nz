@@ -14,6 +14,8 @@ library(table1)
 library(tidygraph)
 library(ggraph)
 library(here)
+library(ggExtra)
+library(patchwork)
 
 theme_set(theme_bw())
 
@@ -52,46 +54,47 @@ q240_summary_sex <- wvs_q %>%
 
 table1(~ Q240 | Q260, data = wvs_q )
 
-# Histogram
+# Histogram and QQ plot
 
-ggplot(wvs_q, aes(Q240)) +
-  geom_histogram(binwidth = 1, colour = "black") +
+q240_hist <- ggplot(wvs_q, aes(Q240)) +
+  geom_histogram(binwidth = 1, colour = "grey") +
   scale_x_continuous(breaks = 1:10) +
-  geom_vline(xintercept = q240_summary$mean,
-             linetype = "dashed",
-             size = 2,
-             colour = "firebrick") +
-  geom_vline(xintercept = q240_summary$median,
-             linetype = "dotted",
-             size = 2,
-             colour = "cornflowerblue") +
-  annotate(geom = "label",
-           x = q240_summary$mean,
-           y = 75,
-           label = str_glue("Mean = {round(q240_summary$mean, 2)}"),
-           colour = "firebrick") +
-  annotate(geom = "label",
-           x = q240_summary$median,
-           y = 50,
-           label = str_glue("Median = {q240_summary$median}"),
-           colour = "cornflowerblue") +
   stat_function(fun = ~dnorm(.x,
                              mean = q240_summary$mean,
                              sd = q240_summary$sd) * q240_summary$n_complete,
-                size = 2) +
-  xlab(expression("Q240 response" ~ ("More left " %<->% " More right")))
+                size = 1) +
+  labs(x = expression("Left " ~ phantom(m) %<->% phantom (m) ~ " right"),
+       y = "Responses",
+       subtitle = "Histogram of responses") +
+  theme(panel.grid.minor = element_blank())
+
+q240_qq <- ggplot(wvs_q, aes(sample = Q240)) +
+  geom_qq(alpha = 1/10) +
+  geom_qq_line() +
+  labs(x = "Theoretical normal quantiles",
+       y = "Sample quantiles",
+       subtitle = "Normal quantile-quantile plot of responses")
+
+q240_hist + q240_qq +
+  plot_annotation(title = "Distribution of left-right political identity")
+
 
 # By sex
 
+# Comparative violin-box-dot plots
 ggbetweenstats(wvs_q,
                x = Q260,
                y = Q240,
                type = "parametric",
                bf.message = FALSE,
-               var.equal = TRUE) +
+               var.equal = TRUE,
+               results.subtitle = FALSE) +
   scale_y_continuous(limits = c(1, 10), breaks = 1:10) +
-  labs(x = "Sex", y = expression(bold("Left " %<->% " right")))
+  labs(x = "Sex", y = expression("Left " ~ phantom(m) %<->% phantom (m) ~ " right")) +
+  theme(panel.grid.minor = element_blank())
 
+# The following figure is redundant since the density curves are shown in the
+# violin plots
 wvs_q %>%
   filter(!is.na(Q260)) %>%
   ggplot(aes(x = Q240, fill = Q260)) +
@@ -101,78 +104,68 @@ wvs_q %>%
 
 # By age
 
-age_stats <- ggscatterstats(wvs_q,
-                            x = Q262,
-                            y = Q240,
-                            bf.message = FALSE,
-                            xlab = "Age",
-                            marginal = NULL,
-                            ylab = expression(bold("Left " %<->% " right")),
-                            output = "subtitle")
+q240_age_lm <- wvs_q %>%
+  mutate(age = Q262 / 10) %>%
+  lm(Q240 ~ age, data = .)
+summary(q240_age_lm)
 
-ggplot(wvs_q, aes(Q262, Q240)) +
-  geom_point(alpha = 1/4) +
+age_overall <- ggplot(wvs_q, aes(Q262, Q240)) +
+  geom_jitter(width = 0, height = 1/4, alpha = 1/4) +
   geom_smooth(method = "lm") +
   scale_y_continuous(breaks = 1:10) + 
   labs(x = "Age",
-       y = expression("Left " %<->% " right"),
-       subtitle = age_stats,
-       title = "Age and political identity") +
+       y = expression("Left " ~ phantom(m) %<->% phantom (m) ~ " right"),
+       subtitle = "Overall") +
   theme(panel.grid.minor.y  = element_blank())
-  
+
 
 
 # By age and sex
 
-age_sex_stats <- grouped_ggscatterstats(wvs_q,
-                       x = Q262,
-                       y = Q240,
-                       grouping.var = Q260,
-                       marginal = NULL,
-                       bf.message = FALSE,
-                       xlab = "Age",
-                       ylab = expression(bold("Left " %<->% ~ " right")),
-                       output = "subtitle")
+q240_age_sex_lm <- wvs_q %>%
+  mutate(age = Q262 / 10) %>%
+  lm(Q240 ~ age * Q260, data = .)
+summary(q240_age_sex_lm)
 
-
-stats_subtitle <- (age_sex_stats)
-
-str(age_sex_stats)
-
-wvs_q %>%
+q240_sex <- wvs_q %>%
   filter(!is.na(Q260)) %>%
   ggplot(aes(x = Q262, y = Q240, colour = Q260)) +
-  geom_point(alpha = 1/4) +
+  geom_jitter(width = 0, height = 1/4, alpha = 1/4) +
   geom_smooth(method = "lm", se = FALSE) +
-  annotate("text",
-           x = 25, y = 8.5,
-           label = age_sex_stats$Male,
-           hjust = 0,
-           colour = "#f8766d") +
-  annotate("text",
-           x = 25, y = 2.5,
-           label = age_sex_stats$Female,
-           hjust = 0,
-           colour = "#00bfc4") +
   scale_y_continuous(breaks = 1:10) + 
   scale_color_discrete("Sex") +
   labs(x = "Age",
-       y = expression("Left " %<->% " right"),
-       title = "Age and political identity by sex") +
+       y = NULL,
+       subtitle = "Interaction with sex") +
   theme(panel.grid.minor.y  = element_blank(),
         legend.position = "bottom")
 
 
+age_overall + q240_sex +
+  theme(legend.position = "right") +
+  plot_annotation("Association between age and political identity")
 
 # By self-reported income
 
-ggscatterstats(wvs_q,
-               x = Q288, 
-               y = Q240,
-               bf.message = FALSE,
-               xlab = expression("Q288: Self-reported income decile (low " %<->% " high)"),
-               ylab = expression(bold("Q240: " ~ "Left " %<->% " right")))
+q240_income_stats <- ggscatterstats(wvs_q,
+                                    x = Q288, 
+                                    y = Q240,
+                                    bf.message = FALSE,
+                                    xlab = expression("Q288: Self-reported income decile (low " %<->% " high)"),
+                                    ylab = expression(bold("Q240: " ~ "Left " %<->% " right")),
+                                    output = "subtitle")
 
+ggplot(wvs_q, aes(Q288, Q240)) +
+  geom_jitter(alpha = 1/5, width = 0.1, height = 0.1) +
+  geom_smooth(method = "lm") +
+  scale_x_continuous(breaks = 1:10) +
+  scale_y_continuous(breaks = 1:10) +
+  theme(panel.grid.minor = element_blank()) +
+  labs(title = "Income and political identity",
+       subtitle = q240_income_stats,
+       x = expression("Q288: Self-reported income decile (low " %<->% "  high)"),
+       y = expression("Q240: " ~ "Left " %<->% " right"))
+  
 
 # Graphical exploration of correlation
 
