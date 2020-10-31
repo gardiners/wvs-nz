@@ -40,27 +40,35 @@ if (file.exists(here("data", "cor_ext.RDS"))){
   saveRDS(wvs_q_cor, here("data", "cor_ext.RDS"))
 }
 
+cor_counts <- wvs_q_cor$type %>% table()
+
+
+#' How many polychoric and polyserial correlations did we compute?
+(cor_counts[3] + cor_counts[4]) / 2
+
 # Graphical lasso to estimate a sparse (regularised) correlation matrix
 
-wvs_q_cor_complete <- wvs_q_cor$correlations
-wvs_q_cor_complete[is.na(wvs_q_cor$correlations)] <- 0
+# wvs_q_cor_complete <- wvs_q_cor$correlations
+# wvs_q_cor_complete[is.na(wvs_q_cor$correlations)] <- 0
+# 
+# if (file.exists(here("data", "glasso.RDS"))){
+#   wvs_glasso <- readRDS(here("data", "glasso.RDS"))
+# } else {
+#   wvs_glasso <- glasso(wvs_q_cor_complete,
+#                        approx = TRUE,
+#                        rho = 0.05,
+#                        nobs = 1057)
+#   saveRDS(wvs_glasso, here("data", "glasso.RDS"))
+# }
+# 
+# 
+# # Remove self-edges (matrix diagonals) and build network.
+# 
+# glasso_net <- wvs_glasso$w %>%
+#   `diag<-`(0) %>%
+#   as_tbl_graph(directed = FALSE)
+# 
+# 
+# ggraph(glasso_net, layout = "fr") +
+#   geom_edge_link()
 
-if (file.exists(here("data", "glasso.RDS"))){
-  wvs_glasso <- readRDS(here("data", "glasso.RDS"))
-} else {
-  wvs_glasso <- glasso(wvs_q_cor_complete,
-                       rho = 0.1,
-                       nobs = 1057)
-  saveRDS(wvs_glasso, here("data", "glasso.RDS"))
-}
-
-
-# Remove self-edges (matrix diagonals) and build network.
-
-glasso_net <- wvs_glasso$w %>%
-  `diag<-`(0) %>%
-  as_tbl_graph(directed = FALSE)
-
-
-ggraph(glasso_net, layout = "fr") +
-  geom_edge_link()
