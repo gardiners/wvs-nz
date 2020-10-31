@@ -128,6 +128,14 @@ ggraph(wvs_net_reduced, layout = "fr") +
 
 #' ### Examine neighbourhoods of interest
 
+#' Political left-right
+#' --------------------
+
+lr_neighbourhood <- wvs_net_reduced %>%
+  convert(to_local_neighborhood,
+          node = which(.N()$name == "Q240"),
+          order = 2)
+
 #' Urban vs rural
 #' --------------
 
