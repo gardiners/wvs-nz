@@ -10,9 +10,8 @@ library(tidyverse)
 library(here)
 library(partykit)
 library(ggparty)
-library(tidygraph)
-library(ggraph)
-library(VGAM)
+# library(tidygraph)
+# library(ggraph)
 
 theme_set(theme_bw())
 
@@ -58,6 +57,7 @@ prep <- function(data, response, subset) {
   UseMethod(generic = "prep",
             object = pull(data, response))
 }
+
 
 #' # Data
 wvs_q <- readRDS(here("data", "nzl_coded.RDS")) %>%
@@ -129,14 +129,12 @@ plot(trees$Q179)
 # ==============================================================================
 # What predicts left-right political identity?
 
-plot(trees$Q240)
+# plot(trees$Q240)
 
-ggplot(wvs_q, aes(Q240)) +
-  geom_histogram(bins = 10)
 
-ggplot(wvs_q, aes(Q240, Q262)) +
-  geom_jitter() +
-  geom_smooth()
+lr_ctrl <- ctree_control(alpha = 0.01,
+                         MIA = FALSE,
+                         minbucket = 10)
 
 # Repeat the model without the choice of party vote.
 lr_tree <- prep(wvs_q, "Q240", training) %>%
@@ -144,6 +142,47 @@ lr_tree <- prep(wvs_q, "Q240", training) %>%
    ctree(Q240 ~ ., data = ., control = ctrl)
 
 plot(lr_tree)
+
+lr_data <- ggparty:::get_plot_data(lr_tree)
+
+ggparty(lr_tree) +
+  geom_edge() +
+  geom_edge_label(
+  ) +
+  geom_node_label(
+    # Inner nodes
+    line_list = list(
+      aes(label = splitvar),
+      aes(label = scales::pvalue(p.value, add_p = TRUE))
+    ),
+    line_gpar = list(
+      list(size = 13),
+      list(size = 8)
+    ),
+    ids = "inner"
+  ) +
+  geom_node_plot(
+    # Terminal plots
+    gglist = list(
+      geom_boxplot(aes(y = Q240),
+                   fill = "grey"),
+      scale_y_continuous(breaks = 1:10),
+      theme(axis.ticks.x = element_blank(),
+            axis.text.x = element_blank(),
+            panel.grid.major.x = element_blank(),
+            panel.grid.minor = element_blank()),
+      labs(y = expression("Left " ~ phantom(m) %<->% phantom (m) ~ " right"))
+    ),
+    shared_axis_labels = TRUE
+    ) +
+  geom_node_label(
+    # Terminal nodes
+    aes(label = paste0("n = ", nodesize)),
+    ids = "terminal",
+    nudge_x = 0.02,
+    nudge_y = -0.01
+  )
+
 
 predict(lr_tree, newdata = prep(wvs_q, "Q240", !training))
 
@@ -170,7 +209,7 @@ sqrt(mean(Q240_pred$sqerr))
 # Does a linear regression do as well with the same variables?
 
 
-Q240_lm <- lm(Q240 ~ Q106 + Q42 + Q193 + Q108 + Q214 + Q252 + Q31,
+Q240_lm <- lm(Q240 ~ Q106 + Q211 + Q252 + Q68 + Q36,
                  data = Q240_train)
 
 summary(Q240_lm)
