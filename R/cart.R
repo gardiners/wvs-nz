@@ -10,14 +10,13 @@ library(tidyverse)
 library(here)
 library(partykit)
 library(ggparty)
-# library(tidygraph)
-# library(ggraph)
+library(ggfortify)
 
 theme_set(theme_bw())
 
 #' # Helper functions:
 
-# Make ordinal variables nominal, with options vector of exceptions.
+# Make ordinal variables nominal, with optional vector of exceptions.
 disorder <- function(data, except = NULL) {
   data %>%
     mutate(across(c(where(is.ordered),
@@ -58,10 +57,30 @@ prep <- function(data, response, subset) {
             object = pull(data, response))
 }
 
+# Root-mean-square-error:
+rmse <- function(observed, predicted){
+  sqrt(mean((observed - predicted)^2,
+            na.rm = TRUE))
+}
 
 #' # Data
 wvs_q <- readRDS(here("data", "nzl_coded.RDS")) %>%
-  select(matches(paste0("Q", c(1:260, 262, 269, 270, 274, 287, 288), "$")))
+  select(matches(paste0("Q", c(1:222, 224:260, 262:265, 269:280,
+                               284:290), "$"))) %>%
+  mutate(across(matches(paste0("Q", 275:278)),
+                function(x) {
+                  x_int <- as.integer(x)
+                  factor(if_else(x_int <= 4,
+                                 "High school",
+                                 "Post high school"))
+                }),
+         across(c(Q279, Q280),
+                ~fct_collapse(.x,
+                              "Employed" = c("Full time (30 hours a week or more)",
+                                                 "Part time (less than 30 hours a week)",
+                                                 "Self employed"),
+                              "Student" = "Student",
+                              other_level = "Unemployed")))
 
 #' Split
 set.seed(20201010)
@@ -78,68 +97,69 @@ ctrl <- ctree_control(alpha = 0.05,
                       minbucket = 10)
 
 # Fit a conditional inference tree for _every_ variable.
-responses <- names(wvs_q) %>%
-  set_names()
-
-tictoc::tic("Sequential map")
-trees <- map(responses,
-             function(response, data, subset, control) {
-               f <- reformulate(".", response) 
-               prep(data, {{response}}, subset) %>%
-                 ctree(f, ., control = ctrl)
-             },
-             data = wvs_q,
-             subset = training,
-             control = ctrl)
-tictoc::toc()
-
-# Extract important splits from each tree
-
-trees_info <- map(trees,
-                  safely(function(tree) {
-                    ggparty:::get_plot_data(tree) %>%
-                      select(-starts_with("nodedata"))
-                  }))
-
-trees_errors <- keep(trees_info, ~!is.null(.x$error))
-
-trees_table <- map_dfr(trees_info, "result", .id = "model")
-
-#' # Query our models of interest
-
-#' Which trees make use of the news source variables?
-
-trees_table %>%
-  filter(splitvar %in% paste0("Q", 201:208))
-
-#' What does social media consumption predict?
-
-trees_table %>%
-  filter(splitvar == "Q207")
-
-#' TV?
-
-trees_table %>%
-  filter(splitvar == "Q202")
-
-plot(trees$Q179)
-
-# What predicts political interest?
+if(FALSE){
+  
+  responses <- names(wvs_q) %>%
+    set_names()
+  
+  tictoc::tic("Sequential map")
+  trees <- map(responses,
+               function(response, data, subset, control) {
+                 f <- reformulate(".", response) 
+                 prep(data, {{response}}, subset) %>%
+                   ctree(f, ., control = ctrl)
+               },
+               data = wvs_q,
+               subset = training,
+               control = ctrl)
+  tictoc::toc()
+  
+  # Extract important splits from each tree
+  
+  trees_info <- map(trees,
+                    safely(function(tree) {
+                      ggparty:::get_plot_data(tree) %>%
+                        select(-starts_with("nodedata"))
+                    }))
+  
+  trees_errors <- keep(trees_info, ~!is.null(.x$error))
+  
+  trees_table <- map_dfr(trees_info, "result", .id = "model")
+  
+  #' # Query our models of interest
+  
+  #' Which trees make use of the news source variables?
+  
+  trees_table %>%
+    filter(splitvar %in% paste0("Q", 201:208))
+  
+  #' What does social media consumption predict?
+  
+  trees_table %>%
+    filter(splitvar == "Q207")
+  
+  #' TV?
+  
+  trees_table %>%
+    filter(splitvar == "Q202")
+  
+  plot(trees$Q179)
+  
+}
 
 # ==============================================================================
+
+
 # What predicts left-right political identity?
 
-# plot(trees$Q240)
-
+# Fit a single model for LR identity
 
 lr_ctrl <- ctree_control(alpha = 0.01,
                          MIA = FALSE,
                          minbucket = 10)
 
-# Repeat the model without the choice of party vote.
 lr_tree <- prep(wvs_q, "Q240", training) %>%
-  select(-Q223) %>%
-   ctree(Q240 ~ ., data = ., control = ctrl)
+   ctree(Q240 ~ ., data = ., control = lr_ctrl)
 
 plot(lr_tree)
 
@@ -184,101 +204,81 @@ ggparty(lr_tree) +
   )
 
 
-predict(lr_tree, newdata = prep(wvs_q, "Q240", !training))
 
+# Extract partitions
 Q240_train <- prep(wvs_q, "Q240", training)
 Q240_test <- prep(wvs_q, "Q240", !training)
 
+# Fit ctrees for varying alpha and minbucket:
+alphas <- c(0.1, 0.05, 0.01, 0.005, 0.001) %>% set_names()
 
-Q240_train_pred <- tibble(
-  observed = Q240_train$Q240,
-  predicted = predict(lr_tree, newdata = Q240_train),
-  sqerr = (observed - predicted)^2
-)
+vary_alpha <- map(alphas,
+                  function(alpha, formula, data){
+                    alpha_ctrl <- ctree_control(alpha = alpha,
+                                                MIA = FALSE,
+                                                minbucket = 10)
+                    ctree(formula, data = data, control = alpha_ctrl)
+                  },
+                  formula = Q240 ~ .,
+                  data = Q240_train)
 
-sqrt(mean(Q240_train_pred$sqerr))
+# Tabulate inner nodes, terminal nodes, training RMSE
+train_table <- imap_dfr(vary_alpha,
+                        function(model, alpha, observed, newdata){
+                          list(
+                            alpha = alpha,
+                            nodes = length(model),
+                            terminal = width(model),
+                            depth = depth(model),
+                            RMSE = rmse(observed = observed$Q240, 
+                                        predicted = predict(model, newdata = newdata))
+                          )},
+                        observed = Q240_train,
+                        newdata = Q240_train)
 
-Q240_pred <- tibble(
-  observed = Q240_test$Q240,
-  predicted = predict(lr_tree, newdata = Q240_test),
-  sqerr = (observed - predicted)^2
-)
+knitr::kable(train_table, digits = 3) %>%
+  kableExtra::kable_classic()
 
-sqrt(mean(Q240_pred$sqerr))
+# ctree Testing RMSE:
+rmse(observed = Q240_test$Q240,
+     predicted = predict(lr_tree, newdata = Q240_test))
+
+# ctree training observations fit
+562 #sum of node sizes
+nrow(Q240_train)
+
+# ctree testing observations fit
+test_obs <- sum(!is.na(predict(lr_tree, newdata = Q240_test)))
+test_obs_extant <- sum(!is.na(Q240_test$Q240))
+
+
+# Variable importance
+varimp(lr_tree, nperm = 1000)
 
 # Does a linear regression do as well with the same variables?
-
-
 Q240_lm <- lm(Q240 ~ Q106 + Q211 + Q252 + Q68 + Q36,
                  data = Q240_train)
 
 summary(Q240_lm)
 
-Q240_lm_pred <- tibble(
-  observed = Q240_test$Q240,
-  predicted = predict(Q240_lm, newdata = Q240_test),
-  sqerr = (observed - predicted)^2
-)
-sqrt(mean(Q240_lm_pred$sqerr, na.rm = TRUE))
+# Training RMSE:
+rmse(observed = Q240_train$Q240,
+     predicted = predict(Q240_lm, newdata = Q240_train))
 
-autoplot(Q240_lm)
+# Testing RMSE:
+rmse(observed = Q240_test$Q240,
+     predicted = predict(Q240_lm, newdata = Q240_test))
 
-# What about including age in the lm?
+lm_obs <- sum(!is.na(predict(Q240_lm, newdata = Q240_train)))
+lm_obs
+lm_obs / nrow(Q240_train)
 
-# Which values does left-right political identity affect?
-varimp(lr_tree, nperm = 100)
-trees_table %>%
-  filter(splitvar == "Q240")
+lm_test_obs <- sum(!is.na(predict(Q240_lm, newdata = Q240_test)))
+lm_test_obs
+lm_test_obs / nrow(Q240_test)
 
-#' LR identity predicts Q36: Homosexual couples are as good parents as other couples (a subset of right-leaning do not think homosexuals are good parents)
-plot(trees$Q36)
-
-#' predicts Q68: Confidence in labour unions (left leaning have more confidence in labour unions) - more important is willingness to strike.
-plot(trees$Q68)
-
-#' predicts Q77: Confidence in major companies (slightly more confidence in companies)
-plot(trees$Q77)
-
-#' predicts Q83: Confidence in the UN
-
-# ==============================================================================
+# Linear model diagnostic plot
+autoplot(Q240_lm, which = c(1:3, 5), label = FALSE, alpha = 1/4)
 
 
-#' Not many revolutionaries in our dataset!
-
-#' ggparty plot
-#' 
-#' # ggparty(wvs_ctree_207) +
-#   geom_edge() +
-#   geom_edge_label(size = 2.5) +
-#   geom_node_splitvar(size = 2.5) +
-#   geom_node_plot(gglist = list(geom_bar(aes(x = Q207)),
-#                                labs(y = NULL)),
-#                  scales = "free_y")
-
-# Produce a variable importance network.
-
-# trees_varimp <- map(trees, varimp, nperm = 1)
-# 
-# trees_nodes <- tibble(name = names(trees)) %>%
-#   mutate(id = row_number())
-# 
-# trees_nodes[trees_nodes$name %in% c("Q1", "Q2"), "id"]
-# 
-# trees_edges <- imap(trees_varimp,
-#                     safely(function(predictors, response, lookup) {
-#                       from <- lookup[lookup$name %in% names(predictors), "id"]
-#                       to <- lookup[lookup$name == response, "id"]
-#                       tibble(from = from$id, to = to$id, weight = predictors)
-#                     }),
-#                     lookup = trees_nodes) %>%
-#   map_dfr("result")
-# 
-# 
-# trees_graph <- tbl_graph(nodes = trees_nodes,
-#                          edges = trees_edges)
-# 
-# ggraph(trees_graph,) +
-#   geom_edge_link(arrow = arrow(), aes(edge_width = weight, alpha = weight)) +
-#   geom_node_label(aes(label = name))
 
