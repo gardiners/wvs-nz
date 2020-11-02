@@ -17,6 +17,7 @@ knitr::opts_chunk$set(echo = TRUE,
 library(tidyverse, quietly = TRUE)
 library(here, quietly = TRUE)
 library(patchwork)
+library(coin)
 
 # Helper functions for data cleaning
 source(here("R", "helpers.R"))
@@ -62,7 +63,7 @@ comparison_barplot <- function(data, factor_col, source_indicator = data_source)
               size = 3,
               position = position_stack(vjust = 0.5)) +
     guides(fill = guide_legend(reverse = TRUE)) +
-    theme(legend.position = "bottom", legend.title = element_blank()) +
+    theme(legend.position = "bottom") +
     labs(x = "Data source",
          y = "Proportion")
 }
@@ -150,7 +151,7 @@ combo_age <- rbind(
 age_plot <- ggplot(combo_age, aes(age, fill = data_source)) +
   geom_density(alpha = 1/2) +
   scale_fill_brewer(type = "qual") +
-  guides(fill = guide_legend("Data source")) +
+  guides(fill = guide_legend("Data source:")) +
   labs(subtitle = "Age distributions",
        x = "Age",
        y = "Density") +
@@ -159,6 +160,11 @@ age_plot <- ggplot(combo_age, aes(age, fill = data_source)) +
 #' These appear to be different distributions. Test more formally with
 #' Kolmogorov-Smirnov test:
 ks.test(wvs_age$age, census_age_expanded)
+
+median(census_age_expanded)
+median(wvs_age$age)
+
+median_test(age ~ factor(data_source), data = combo_age)
 
 #' The distribution of ages of survey respondents does not match the population,
 #' even considering the removal of under-18s. The age distribution of
@@ -184,6 +190,7 @@ wvs_sex_tab <- wvs_sex %>%
 # Combine and plot
 combo_sex <- combine_sets(census_sex_tab, wvs_sex_tab)
 sex_plot <- comparison_barplot(combo_sex, sex) +
+  scale_fill_discrete("Sex:") +
   labs(subtitle = "Sex distributions")
 
 #' These appear to be different distributions. Test more formally with a
@@ -227,7 +234,8 @@ wvs_educ_tab <- wvs_education %>%
 # Combine and plot:
 combo_educ <- combine_sets(census_educ_tab, wvs_educ_tab)
 educ_plot <- comparison_barplot(combo_educ, post_school) +
-  scale_fill_discrete(labels = c("Secondary", "Post-secondary")) +
+  scale_fill_discrete("Education:",
+                      labels = c("Secondary", "Post-secondary")) +
   labs(subtitle = "Proportion with post-secondary education")
 
 #' Once again, these look to be markedly different distributions. We can test:
@@ -279,6 +287,8 @@ census_birth_tab <- census_birth %>%
 # Combine and plot:
 combo_birth <- combine_sets(census_birth_tab, wvs_birth_tab)
 birth_plot <- comparison_barplot(combo_birth, factor_col = country) +
+  scale_fill_discrete("Birthplace:",
+                      labels = c("NZ", "Other", "UK")) +
   labs(subtitle = "Distribution of birthplaces")
 
 educ_plot + birth_plot +
