@@ -16,13 +16,15 @@ library(ggraph)
 library(here)
 library(ggExtra)
 library(patchwork)
+library(e1071)
+library(corrplot)
 
 theme_set(theme_bw())
 
 #' # Data
 
 wvs_q <- readRDS(here("data", "nzl_coded.RDS")) %>%
-  select(matches(paste0("Q", c(1:260, 262, 269, 270, 274, 287, 288), "$")))
+  select(matches(paste0("Q", c(1:260, 262, 269, 270, 274:278, 287, 288), "$")))
 
 
 #' # Exploratory
@@ -50,9 +52,14 @@ q240_summary_sex <- wvs_q %>%
             max = max(Q240, na.rm = TRUE),
             iqr = IQR(Q240, na.rm = TRUE))
 
-# Table 1
+# Summary statistics
 
 table1(~ Q240 | Q260, data = wvs_q )
+
+# Other moments
+skewness(wvs_q$Q240, na.rm = TRUE)
+kurtosis(wvs_q$Q240, na.rm = TRUE)
+
 
 # Histogram and QQ plot
 
@@ -90,7 +97,9 @@ ggbetweenstats(wvs_q,
                var.equal = TRUE,
                results.subtitle = FALSE) +
   scale_y_continuous(limits = c(1, 10), breaks = 1:10) +
-  labs(x = "Sex", y = expression("Left " ~ phantom(m) %<->% phantom (m) ~ " right")) +
+  labs(x = "Sex",
+       y = expression("Left " ~ phantom(m) %<->% phantom (m) ~ " right"),
+       title = "Political identity by sex") +
   theme(panel.grid.minor = element_blank())
 
 # The following figure is redundant since the density curves are shown in the
@@ -108,6 +117,7 @@ q240_age_lm <- wvs_q %>%
   mutate(age = Q262 / 10) %>%
   lm(Q240 ~ age, data = .)
 summary(q240_age_lm)
+confint(q240_age_lm)
 
 age_overall <- ggplot(wvs_q, aes(Q262, Q240)) +
   geom_jitter(width = 0, height = 1/4, alpha = 1/4) +
@@ -126,6 +136,7 @@ q240_age_sex_lm <- wvs_q %>%
   mutate(age = Q262 / 10) %>%
   lm(Q240 ~ age * Q260, data = .)
 summary(q240_age_sex_lm)
+confint(q240_age_sex_lm)
 
 q240_sex <- wvs_q %>%
   filter(!is.na(Q260)) %>%
@@ -147,25 +158,46 @@ age_overall + q240_sex +
 
 # By self-reported income
 
-q240_income_stats <- ggscatterstats(wvs_q,
-                                    x = Q288, 
-                                    y = Q240,
-                                    bf.message = FALSE,
-                                    xlab = expression("Q288: Self-reported income decile (low " %<->% " high)"),
-                                    ylab = expression(bold("Q240: " ~ "Left " %<->% " right")),
-                                    output = "subtitle")
-
 ggplot(wvs_q, aes(Q288, Q240)) +
   geom_jitter(alpha = 1/5, width = 0.1, height = 0.1) +
   geom_smooth(method = "lm") +
   scale_x_continuous(breaks = 1:10) +
   scale_y_continuous(breaks = 1:10) +
   theme(panel.grid.minor = element_blank()) +
-  labs(title = "Income and political identity",
-       subtitle = q240_income_stats,
-       x = expression("Q288: Self-reported income decile (low " %<->% "  high)"),
-       y = expression("Q240: " ~ "Left " %<->% " right"))
-  
+  labs(title = "Political identity by income",
+       x = expression("Self-reported income decile (low"  %<->%  "high)"),
+       y = expression("Left" ~ phantom(m) %<->% phantom(m) ~ "right"))
+
+q240_income_lm <- lm(Q240 ~ Q288, data = wvs_q)
+summary(q240_income_lm)
+confint(q240_income_lm)
+
+# By level of education
+
+wvs_educ <- wvs_q %>%
+  mutate(across(matches(paste0("Q", 275:278)),
+                function(x) {
+                  x_int <- as.integer(x)
+                  factor(if_else(x_int <= 4,
+                                 "High school",
+                                 "Post high school"))
+                }))
+
+ggbetweenstats(wvs_educ,
+               x = Q275,
+               y = Q240,
+               type = "parametric",
+               bf.message = FALSE,
+               var.equal = FALSE,
+               results.subtitle = FALSE) +
+  scale_y_continuous(limits = c(1, 10), breaks = 1:10) +
+  labs(x = "Education",
+       y = expression("Left " ~ phantom(m) %<->% phantom (m) ~ " right"),
+       title = "Political identity by education") +
+  theme(panel.grid.minor = element_blank())
+
+t.test(Q240 ~ Q275, data = wvs_educ, var.equal = FALSE)
+
 
 # Graphical exploration of correlation
 
@@ -193,6 +225,7 @@ cor_subset_labels <- map(cor_subset,
                            }
                          })
 
+# ggplot heatmap
 wvs_q_cor %>%
   filter(from %in% cor_subset,
          to %in% cor_subset) %>%
@@ -211,6 +244,16 @@ wvs_q_cor %>%
   theme(axis.text.x = element_text(angle = 90, vjust = -1),
         legend.key.height = unit(10, "mm")) +
   labs(x = NULL, y = NULL)
+
+# corrplot heatmap
+wvs_cor_mat <- wvs_q_cor %>%
+  filter(from %in% cor_subset,
+         to %in% cor_subset) %>%
+  pivot_wider(names_from = "to") %>%
+  column_to_rownames("from") %>%
+  as.matrix()
+
+corrplot(wvs_cor_mat, method = "color", type = "full", tl.col = "black")
 
 # Variable selection
 # Very few complete cases.
