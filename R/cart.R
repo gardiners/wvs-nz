@@ -11,6 +11,7 @@ library(here)
 library(partykit)
 library(ggparty)
 library(ggfortify)
+library(gtsummary)
 
 theme_set(theme_bw())
 
@@ -21,7 +22,7 @@ disorder <- function(data, except = NULL) {
   data %>%
     mutate(across(c(where(is.ordered),
                     -{{except}}),
-                    ~factor(.x, ordered = FALSE)))
+                  ~factor(.x, ordered = FALSE)))
 }
 
 # Reverse the order of given ordinal variables.
@@ -39,7 +40,7 @@ prep.ordered <- function(data, response, subset) {
     reverse_order({{response}}) %>%
     subset(subset) %>%
     filter(across(.cols = {{response}},
-           ~!is.na(.x)))
+                  ~!is.na(.x)))
 }
 
 # (factors and numeric)
@@ -77,17 +78,17 @@ wvs_q <- readRDS(here("data", "nzl_coded.RDS")) %>%
          across(c(Q279, Q280),
                 ~fct_collapse(.x,
                               "Employed" = c("Full time (30 hours a week or more)",
-                                                 "Part time (less than 30 hours a week)",
-                                                 "Self employed"),
+                                             "Part time (less than 30 hours a week)",
+                                             "Self employed"),
                               "Student" = "Student",
                               other_level = "Unemployed")))
 
 #' Split
 set.seed(20201010)
 training <- sample(c(TRUE, FALSE),
-                      size = nrow(wvs_q),
-                      prob = c(0.7, 0.3),
-                      replace = TRUE)
+                   size = nrow(wvs_q),
+                   prob = c(0.7, 0.3),
+                   replace = TRUE)
 
 #' # Build trees
 
@@ -97,55 +98,51 @@ ctrl <- ctree_control(alpha = 0.05,
                       minbucket = 10)
 
 # Fit a conditional inference tree for _every_ variable.
-if(FALSE){
-  
-  responses <- names(wvs_q) %>%
-    set_names()
-  
-  tictoc::tic("Sequential map")
-  trees <- map(responses,
-               function(response, data, subset, control) {
-                 f <- reformulate(".", response) 
-                 prep(data, {{response}}, subset) %>%
-                   ctree(f, ., control = ctrl)
-               },
-               data = wvs_q,
-               subset = training,
-               control = ctrl)
-  tictoc::toc()
-  
-  # Extract important splits from each tree
-  
-  trees_info <- map(trees,
-                    safely(function(tree) {
-                      ggparty:::get_plot_data(tree) %>%
-                        select(-starts_with("nodedata"))
-                    }))
-  
-  trees_errors <- keep(trees_info, ~!is.null(.x$error))
-  
-  trees_table <- map_dfr(trees_info, "result", .id = "model")
-  
-  #' # Query our models of interest
-  
-  #' Which trees make use of the news source variables?
-  
-  trees_table %>%
-    filter(splitvar %in% paste0("Q", 201:208))
-  
-  #' What does social media consumption predict?
-  
-  trees_table %>%
-    filter(splitvar == "Q207")
-  
-  #' TV?
-  
-  trees_table %>%
-    filter(splitvar == "Q202")
-  
-  plot(trees$Q179)
-  
-}
+
+responses <- names(wvs_q) %>%
+  set_names()
+
+trees <- map(responses,
+             function(response, data, subset, control) {
+               f <- reformulate(".", response) 
+               prep(data, {{response}}, subset) %>%
+                 ctree(f, ., control = ctrl)
+             },
+             data = wvs_q,
+             subset = training,
+             control = ctrl)
+
+# Extract important splits from each tree
+
+trees_info <- map(trees,
+                  safely(function(tree) {
+                    ggparty:::get_plot_data(tree) %>%
+                      select(-starts_with("nodedata"))
+                  }))
+
+trees_errors <- keep(trees_info, ~!is.null(.x$error))
+
+trees_table <- map_dfr(trees_info, "result", .id = "model")
+
+#' # Query our models of interest
+
+#' Which trees make use of the news source variables?
+
+trees_table %>%
+  filter(splitvar %in% paste0("Q", 201:208))
+
+#' What does social media consumption predict?
+
+trees_table %>%
+  filter(splitvar == "Q207")
+
+#' TV?
+
+trees_table %>%
+  filter(splitvar == "Q202")
+
+plot(trees$Q179)
+
 
 # ==============================================================================
 
@@ -159,7 +156,7 @@ lr_ctrl <- ctree_control(alpha = 0.01,
                          minbucket = 10)
 
 lr_tree <- prep(wvs_q, "Q240", training) %>%
-   ctree(Q240 ~ ., data = ., control = lr_ctrl)
+  ctree(Q240 ~ ., data = ., control = lr_ctrl)
 
 plot(lr_tree)
 
@@ -194,7 +191,7 @@ ggparty(lr_tree) +
       labs(y = expression("Left " ~ phantom(m) %<->% phantom (m) ~ " right"))
     ),
     shared_axis_labels = TRUE
-    ) +
+  ) +
   geom_node_label(
     # Terminal nodes
     aes(label = paste0("n = ", nodesize)),
@@ -256,8 +253,8 @@ test_obs_extant <- sum(!is.na(Q240_test$Q240))
 varimp(lr_tree, nperm = 1000)
 
 # Does a linear regression do as well with the same variables?
-Q240_lm <- lm(Q240 ~ Q106 + Q211 + Q252 + Q68 + Q36,
-                 data = Q240_train)
+Q240_lm <- lm(Q240 ~ Q106 + relevel(Q211, ref = 2) + Q252 + fct_rev(Q68) + relevel(Q36, ref =3),
+              data = Q240_train)
 
 summary(Q240_lm)
 
@@ -280,5 +277,6 @@ lm_test_obs / nrow(Q240_test)
 # Linear model diagnostic plot
 autoplot(Q240_lm, which = c(1:3, 5), label = FALSE, alpha = 1/4)
 
+# Linear model summary table
 
-
+tbl_regression(Q240_lm)
