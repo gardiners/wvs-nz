@@ -160,10 +160,12 @@ ggplot(interview_dates, aes(J_INTDATE)) +
   annotate("text",
            x = halfway + 7,
            y = 125,
-           label = paste("Half received by",
+           label = paste("Half returned  by",
                          strftime(halfway, "%d %b %Y")),
            hjust = 0) +
-  labs(x = "Interview date")
+  labs(x = "Response date",
+       y = "Responses",
+       title = "Mail-in survey responses over time")
 
 
 #' ## Demographic EDA
