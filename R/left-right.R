@@ -8,16 +8,14 @@
 
 library(tidyverse)
 library(ggstatsplot)
-library(partykit)
 library(ggparty)
 library(table1)
-library(tidygraph)
-library(ggraph)
 library(here)
 library(ggExtra)
 library(patchwork)
 library(e1071)
 library(corrplot)
+library(stargazer)
 
 theme_set(theme_bw())
 
@@ -255,10 +253,6 @@ wvs_cor_mat <- wvs_q_cor %>%
 
 corrplot(wvs_cor_mat, method = "color", type = "full", tl.col = "black")
 
-# Variable selection
-# Very few complete cases.
-wvs_q %>%
-  na.omit() %>%
-  nrow()
+# Exploratory model table
 
-
+stargazer(q240_age_lm, q240_age_sex_lm, q240_income_lm)
